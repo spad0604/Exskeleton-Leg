@@ -1,5 +1,5 @@
 use serde::Serialize;
-use serde_repr:: Serialize_repr;
+use serde_repr::Serialize_repr;
 
 #[derive(Serialize_repr, Debug, Clone, Copy)]
 #[repr(u8)]
@@ -12,7 +12,7 @@ pub enum ResponseStatus {
 pub struct BaseResponse<T> {
     pub status: ResponseStatus,
     pub message: String,
-    pub data: Option<T>
+    pub data: Option<T>,
 }
 
 impl<T> BaseResponse<T> {

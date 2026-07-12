@@ -1,12 +1,12 @@
-use uuid::Uuid;
 use chrono::NaiveDate;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 #[serde(rename_all = "snake_case")]
-enum Role {
+pub enum Role {
     Admin,
-    User
+    User,
 }
 
 #[derive(Serialize, Deserialize, Clone)]
@@ -16,5 +16,5 @@ pub struct User {
     pub full_name: String,
     pub password_hash: String,
     pub dob: NaiveDate,
-    pub user_role: Role
+    pub user_role: Role,
 }
