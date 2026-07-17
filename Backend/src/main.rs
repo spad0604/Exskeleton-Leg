@@ -1,36 +1,22 @@
-use std::sync::Arc;
-
-use app_state::AppState;
-use repositories::user_repository::UserRepository;
-use services::auth_service::AuthService;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
-
-mod app_state;
-mod dto;
-mod error;
-mod models;
-mod repositories;
-mod routes;
-mod services;
+use backend::{bootstrap, bootstrap::config::Config};
 
 #[tokio::main]
 async fn main() {
-    tracing_subscriber::fmt::init();
+    tracing_subscriber::fmt()
+        .with_target(false)
+        .compact()
+        .init();
 
-    let user_repository = Arc::new(UserRepository::new());
-    let auth_service = AuthService::new(user_repository, "dev-secret-change-me".to_string());
-    let state = AppState { auth_service };
-
-    let app = routes::routes()
-        .with_state(state)
-        .layer(CorsLayer::permissive())
-        .layer(TraceLayer::new_for_http());
-
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:8080")
+    let config = Config::from_env().expect("invalid backend configuration");
+    let address = config.bind_address;
+    let app = bootstrap::build_app(config)
+        .await
+        .expect("failed to initialize backend");
+    let listener = tokio::net::TcpListener::bind(address)
         .await
         .expect("failed to bind server");
 
-    println!("Backend running at http://0.0.0.0:8080");
+    tracing::info!(%address, "backend listening");
 
     axum::serve(listener, app).await.expect("server failed");
 }

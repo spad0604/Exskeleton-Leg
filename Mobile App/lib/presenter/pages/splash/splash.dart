@@ -4,6 +4,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/di.dart';
+import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
+import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
 import 'package:flutter_starter/presenter/pages/splash/splash_bloc.dart';
 import 'package:flutter_starter/presenter/pages/splash/splash_event.dart';
@@ -38,7 +40,19 @@ class _SplashPageState extends State<SplashPage> {
     });
   }
 
-  void _onSuccess(BuildContext context, SplashState state) {
+  void _onSuccess(BuildContext context, SplashState state) async {
+    final account = state.account;
+    if (account == null) {
+      context.router.replaceAll([const LoginRoute()]);
+      return;
+    }
+    final authBloc = context.read<AuthBloc>();
+    final authenticated = authBloc.stream.firstWhere(
+      (authState) => authState.loggedIn,
+    );
+    authBloc.add(AuthLoggedIn(account));
+    await authenticated;
+    if (!context.mounted) return;
     context.router.replaceAll([const HomeRoute()]);
   }
 

@@ -26,27 +26,23 @@ abstract class RegisterModule {
 
   @Named('baseUrl')
   @singleton
-  String get baseUrl => "https://example.com";
+  String get baseUrl => const String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'http://10.0.2.2:8080/api/v1/',
+  );
 }
 
 class GlobalBlocProviders extends StatelessWidget {
   final Widget child;
 
-  const GlobalBlocProviders({
-    super.key,
-    required this.child,
-  });
+  const GlobalBlocProviders({super.key, required this.child});
 
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
-        BlocProvider<AuthBloc>.value(
-          value: provider.get<AuthBloc>(),
-        ),
-        BlocProvider<SettingsBloc>.value(
-          value: provider.get<SettingsBloc>(),
-        ),
+        BlocProvider<AuthBloc>.value(value: provider.get<AuthBloc>()),
+        BlocProvider<SettingsBloc>.value(value: provider.get<SettingsBloc>()),
       ],
       child: child,
     );

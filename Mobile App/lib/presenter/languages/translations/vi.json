@@ -2,10 +2,12 @@
   "Errors": {
     "AnUnknownErrorOccurred": "Lỗi không xác định",
     "NetworkError": "Hãy kiểm tra kết nối mạng của bạn",
-    "InvalidUsernameOrPassword": "Tên đăng nhập hoặc mật khẩu không đúng"
+    "InvalidUsernameOrPassword": "Email hoặc mật khẩu không đúng",
+    "EmailAlreadyExists": "Email này đã được sử dụng",
+    "TermsNotAccepted": "Bạn cần xác nhận điều khoản sử dụng"
   },
   "Hello": "Xin chào",
-  "Username": "Tên đăng nhập",
+  "Username": "Email",
   "Password": "Mật khẩu",
   "Login": "Đăng nhập"
 }

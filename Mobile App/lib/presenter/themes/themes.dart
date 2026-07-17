@@ -25,11 +25,9 @@ class AppTheme extends ThemeExtension<AppTheme> {
       : const ColorScheme.dark();
 
   ThemeData get themeData => ThemeData(
-        useMaterial3: false,
-        platform: TargetPlatform.iOS,
+        useMaterial3: true,
         extensions: [this],
         brightness: brightness,
-        primarySwatch: colors.primarySwatch,
         primaryColor: colors.primary,
         unselectedWidgetColor: colors.hint,
         disabledColor: colors.disabled,
@@ -40,16 +38,49 @@ class AppTheme extends ThemeExtension<AppTheme> {
         colorScheme: baseColorScheme.copyWith(
           primary: colors.primary,
           onPrimary: colors.textOnPrimary,
+          primaryContainer: const Color(0xFFD1E4FF),
+          onPrimaryContainer: const Color(0xFF001D36),
           secondary: colors.secondary,
           onSecondary: colors.textOnPrimary,
+          secondaryContainer: const Color(0xFFD5E4F7),
+          onSecondaryContainer: const Color(0xFF0E1D2A),
+          surface: const Color(0xFFF8F9FF),
+          onSurface: const Color(0xFF191C20),
+          onSurfaceVariant: const Color(0xFF42474E),
+          outline: const Color(0xFF73777F),
+          outlineVariant: const Color(0xFFC3C7CF),
           error: colors.error,
           shadow: colors.border,
+        ),
+        textTheme: const TextTheme(
+          headlineSmall: TextStyle(
+            fontSize: 24,
+            height: 32 / 24,
+            fontWeight: FontWeight.w600,
+          ),
+          titleLarge: TextStyle(
+            fontSize: 22,
+            height: 28 / 22,
+            fontWeight: FontWeight.w600,
+          ),
+          titleMedium: TextStyle(
+            fontSize: 16,
+            height: 1.5,
+            fontWeight: FontWeight.w600,
+          ),
+          bodyLarge: TextStyle(fontSize: 18, height: 28 / 18),
+          bodyMedium: TextStyle(fontSize: 16, height: 1.5),
+          labelLarge: TextStyle(
+            fontSize: 16,
+            height: 1.5,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         appBarTheme: AppBarTheme(
           elevation: 0,
           titleTextStyle: typographies.body,
-          centerTitle: true,
-          color: Colors.transparent,
+          centerTitle: false,
+          backgroundColor: Colors.transparent,
           foregroundColor: colors.text,
           surfaceTintColor: colors.text,
         ),
@@ -59,6 +90,7 @@ class AppTheme extends ThemeExtension<AppTheme> {
         ),
         filledButtonTheme: FilledButtonThemeData(
           style: styles.buttonLarge.copyWith(
+            minimumSize: const WidgetStatePropertyAll(Size(48, 56)),
             backgroundColor: WidgetStateProperty.resolveWith((states) {
               return states.contains(WidgetState.disabled)
                   ? colors.disabled
@@ -69,7 +101,11 @@ class AppTheme extends ThemeExtension<AppTheme> {
                   ? colors.disabled
                   : null; // Defer to the widget's default.
             }),
-            shape: WidgetStatePropertyAll(StadiumBorder()),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -84,7 +120,11 @@ class AppTheme extends ThemeExtension<AppTheme> {
                   ? colors.disabled
                   : null; // Defer to the widget's default.
             }),
-            shape: WidgetStatePropertyAll(StadiumBorder()),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
           ),
         ),
         outlinedButtonTheme: OutlinedButtonThemeData(
@@ -99,7 +139,11 @@ class AppTheme extends ThemeExtension<AppTheme> {
                   ? colors.disabled
                   : null; // Defer to the widget's default.
             }),
-            shape: WidgetStatePropertyAll(StadiumBorder()),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
           ),
         ),
         textButtonTheme: TextButtonThemeData(
@@ -114,12 +158,16 @@ class AppTheme extends ThemeExtension<AppTheme> {
                   ? colors.disabled
                   : null; // Defer to the widget's default.
             }),
-            shape: WidgetStatePropertyAll(StadiumBorder()),
+            shape: WidgetStatePropertyAll(
+              RoundedRectangleBorder(
+                borderRadius: BorderRadius.all(Radius.circular(12)),
+              ),
+            ),
           ),
         ),
         inputDecorationTheme: InputDecorationTheme(
           contentPadding:
-              const EdgeInsets.symmetric(vertical: 8, horizontal: 42),
+              const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
           filled: true,
           fillColor: colors.backgroundDark,
           hintStyle: typographies.bodySmall.copyWith(
@@ -127,8 +175,16 @@ class AppTheme extends ThemeExtension<AppTheme> {
             color: colors.text.withValues(alpha: 0.4),
           ),
           border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(100),
-            borderSide: BorderSide.none,
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colors.border),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colors.border),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: colors.primary, width: 2),
           ),
           // prefixIconColor: colors.text,
           // suffixIconColor: colors.text,

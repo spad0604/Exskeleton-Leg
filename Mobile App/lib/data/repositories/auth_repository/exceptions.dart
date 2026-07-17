@@ -6,9 +6,19 @@ abstract class AuthException extends BaseException {
       : super(message ?? LocaleKeys.Errors_AnUnknownErrorOccurred);
 }
 
-class UnauthorizedException extends AuthException {}
+class UnauthorizedException extends AuthException {
+  UnauthorizedException({super.data});
+}
 
 class LoginInvalidEmailPasswordException extends AuthException {
   LoginInvalidEmailPasswordException()
       : super(message: LocaleKeys.Errors_InvalidUsernameOrPassword);
+}
+
+class EmailAlreadyExistsException extends AuthException {
+  EmailAlreadyExistsException() : super(message: 'Errors.EmailAlreadyExists');
+}
+
+class TermsNotAcceptedException extends AuthException {
+  TermsNotAcceptedException() : super(message: 'Errors.TermsNotAccepted');
 }

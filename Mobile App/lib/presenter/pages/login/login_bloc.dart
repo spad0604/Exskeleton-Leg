@@ -13,8 +13,8 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
   final LoginUseCase _login;
 
   LoginBloc({required LoginUseCase login})
-      : _login = login,
-        super(const LoginState()) {
+    : _login = login,
+      super(const LoginState()) {
     on<LoginErrorOccurred>(_onErrorOccurred);
     on<LoginUsernameChanged>(_onUsernameChanged, transformer: droppable());
     on<LoginPasswordChanged>(_onPasswordChanged, transformer: droppable());
@@ -32,46 +32,41 @@ class LoginBloc extends Bloc<LoginEvent, LoginState> {
     LoginErrorOccurred event,
     Emitter<LoginState> emit,
   ) {
-    emit(state.copyWith(
-      status: LoginStatus.failure,
-      error: event.error,
-    ));
+    emit(state.copyWith(status: LoginStatus.failure, error: event.error));
   }
 
   FutureOr<void> _onUsernameChanged(
     LoginUsernameChanged event,
     Emitter<LoginState> emit,
   ) {
-    emit(state.copyWith(
-      username: event.username,
-    ));
+    emit(state.copyWith(username: event.username));
   }
 
   FutureOr<void> _onPasswordChanged(
     LoginPasswordChanged event,
     Emitter<LoginState> emit,
   ) {
-    emit(state.copyWith(
-      password: event.password,
-    ));
+    emit(state.copyWith(password: event.password));
   }
 
-  FutureOr _onLoginStarted(
-    LoginStarted event,
-    Emitter<LoginState> emit,
-  ) async {
-    emit(state.copyWith(
-      status: LoginStatus.submitting,
-    ));
+  FutureOr _onLoginStarted(LoginStarted event, Emitter<LoginState> emit) async {
+    emit(state.copyWith(status: LoginStatus.submitting));
 
-    final account = await _login((
-      username: state.username,
-      password: state.password,
-    ));
+    try {
+      final account = await _login((
+        email: state.username,
+        password: state.password,
+      ));
 
-    emit(state.copyWith(
-      status: LoginStatus.success,
-      account: account,
-    ));
+      emit(
+        state.copyWith(
+          status: LoginStatus.success,
+          account: account,
+          error: null,
+        ),
+      );
+    } catch (error, stackTrace) {
+      addError(error, stackTrace);
+    }
   }
 }

@@ -1,17 +1,28 @@
-import 'package:flutter/foundation.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+class Account {
+  final String id;
+  final String displayName;
+  final List<String> roles;
+  final String? email;
+  final String? locale;
+  final String? timezone;
 
-part 'account.freezed.dart';
-part 'account.g.dart';
+  const Account({
+    required this.id,
+    required this.displayName,
+    required this.roles,
+    this.email,
+    this.locale,
+    this.timezone,
+  });
 
-@freezed
-class Account with _$Account {
-  const factory Account({
-    required String id,
-    required String email,
-    required String name,
-    String? avatar,
-  }) = _Account;
-
-  factory Account.fromJson(Map<String, Object?> json) => _$AccountFromJson(json);
+  factory Account.fromJson(Map<String, dynamic> json) => Account(
+    id: json['id'] as String,
+    displayName: json['display_name'] as String,
+    roles: (json['roles'] as List<dynamic>? ?? const [])
+        .whereType<String>()
+        .toList(growable: false),
+    email: json['email'] as String?,
+    locale: json['locale'] as String?,
+    timezone: json['timezone'] as String?,
+  );
 }

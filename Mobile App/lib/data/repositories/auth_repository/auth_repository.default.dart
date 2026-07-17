@@ -1,7 +1,8 @@
-import 'package:dio/dio.dart';
 import 'package:injectable/injectable.dart';
+import 'package:flutter_starter/core/exception.dart';
 import 'package:flutter_starter/data/entities/account.dart';
 import 'package:flutter_starter/data/entities/request/login_params.dart';
+import 'package:flutter_starter/data/entities/request/register_params.dart';
 import 'package:flutter_starter/data/repositories/auth_repository/auth_repository.dart';
 import 'package:flutter_starter/data/repositories/auth_repository/exceptions.dart';
 import 'package:flutter_starter/data/sources/network/network.dart';
@@ -10,33 +11,54 @@ import 'package:flutter_starter/data/sources/network/network.dart';
 class DefaultAuthRepository extends AuthRepository {
   final NetworkDataSource _networkDataSource;
 
-  DefaultAuthRepository({
-    required NetworkDataSource networkDataSource,
-  }) : _networkDataSource = networkDataSource;
+  DefaultAuthRepository({required NetworkDataSource networkDataSource})
+    : _networkDataSource = networkDataSource;
 
   @override
   Future<Account> verifyLoginStatus() async {
-    try {
-      return await _networkDataSource.getCurrentAccount();
-    } catch (e) {
-      throw UnauthorizedException();
-    }
+    return _networkDataSource.getCurrentAccount();
   }
 
   @override
   Future<Account> login({
-    required String username,
+    required String email,
     required String password,
   }) async {
     try {
-      final account = await _networkDataSource.login(LoginParams(
-        username: username,
-        password: password,
-      ));
+      final account = await _networkDataSource.login(
+        LoginParams(email: email.trim().toLowerCase(), password: password),
+      );
 
       return account;
-    } on DioException {
+    } on UnauthorizedException {
       throw LoginInvalidEmailPasswordException();
     }
   }
+
+  @override
+  Future<Account> register({
+    required String email,
+    required String password,
+    required String displayName,
+    required bool acceptedTerms,
+  }) async {
+    if (!acceptedTerms) throw TermsNotAcceptedException();
+    try {
+      return await _networkDataSource.register(
+        RegisterParams(
+          email: email.trim().toLowerCase(),
+          password: password,
+          displayName: displayName.trim(),
+        ),
+      );
+    } on ApiException catch (error) {
+      if (error.code == 'identity.email_already_exists') {
+        throw EmailAlreadyExistsException();
+      }
+      rethrow;
+    }
+  }
+
+  @override
+  Future<void> logout() => _networkDataSource.logout();
 }

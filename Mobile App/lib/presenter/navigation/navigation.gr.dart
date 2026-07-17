@@ -21,7 +21,7 @@ class HomeRoute extends PageRouteInfo<void> {
   static PageInfo page = PageInfo(
     name,
     builder: (data) {
-      return const HomePage();
+      return WrappedRoute(child: const HomePage());
     },
   );
 }
@@ -38,6 +38,22 @@ class LoginRoute extends PageRouteInfo<void> {
     name,
     builder: (data) {
       return WrappedRoute(child: LoginPage());
+    },
+  );
+}
+
+/// generated route for
+/// [RegisterPage]
+class RegisterRoute extends PageRouteInfo<void> {
+  const RegisterRoute({List<PageRouteInfo>? children})
+    : super(RegisterRoute.name, initialChildren: children);
+
+  static const String name = 'RegisterRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return WrappedRoute(child: const RegisterPage());
     },
   );
 }

@@ -3,14 +3,12 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/di.dart';
-import 'package:flutter_starter/flavors.dart';
 import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
 import 'package:flutter_starter/presenter/pages/login/login_bloc.dart';
 import 'package:flutter_starter/presenter/pages/login/login_event.dart';
 import 'package:flutter_starter/presenter/pages/login/login_selector.dart';
 import 'package:flutter_starter/presenter/pages/login/login_state.dart';
-import 'package:flutter_starter/presenter/themes/extensions.dart';
 import 'package:flutter_starter/presenter/widgets/loading_indicator.dart';
 
 @RoutePage()
@@ -30,6 +28,9 @@ class LoginPage extends StatefulWidget implements AutoRouteWrapper {
 }
 
 class _LoginPageState extends State<LoginPage> {
+  final _formKey = GlobalKey<FormState>();
+  bool _obscurePassword = true;
+
   LoginBloc get _bloc => context.read<LoginBloc>();
 
   void _onUsernameChanged(String username) {
@@ -41,6 +42,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _onLoginPressed() {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
     _bloc.add(const LoginStarted());
   }
 
@@ -56,7 +58,7 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(tr(errorMessage)),
-        backgroundColor: context.colors.error,
+        backgroundColor: Theme.of(context).colorScheme.error,
       ),
     );
   }
@@ -69,51 +71,113 @@ class _LoginPageState extends State<LoginPage> {
         LoginFailureListener(listener: _onError),
       ],
       child: Scaffold(
-        body: Center(
-          child: Container(
-            constraints: BoxConstraints(maxWidth: 512),
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              spacing: 16,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Text(
-                    F.title,
-                    textAlign: TextAlign.center,
-                    style: context.typographies.heading,
+        body: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 480),
+                child: AutofillGroup(
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Icon(
+                          Icons.accessibility_new_rounded,
+                          size: 56,
+                          color: Theme.of(context).colorScheme.primary,
+                          semanticLabel: 'Exoskeleton Leg',
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Chào mừng trở lại',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.headlineSmall,
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Đăng nhập để tiếp tục chương trình tập của bạn.',
+                          textAlign: TextAlign.center,
+                          style: Theme.of(context).textTheme.bodyLarge,
+                        ),
+                        const SizedBox(height: 32),
+                        TextFormField(
+                          keyboardType: TextInputType.emailAddress,
+                          autofillHints: const [AutofillHints.email],
+                          textInputAction: TextInputAction.next,
+                          decoration: const InputDecoration(
+                            prefixIcon: Icon(Icons.email_outlined),
+                            labelText: 'Email',
+                          ),
+                          validator: _validateEmail,
+                          onChanged: _onUsernameChanged,
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          autofillHints: const [AutofillHints.password],
+                          textInputAction: TextInputAction.done,
+                          decoration: InputDecoration(
+                            prefixIcon: const Icon(Icons.lock_outline),
+                            labelText: tr(LocaleKeys.Password),
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Hiện mật khẩu'
+                                  : 'Ẩn mật khẩu',
+                              onPressed: () => setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              }),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                          ),
+                          obscureText: _obscurePassword,
+                          validator: (value) => (value?.isEmpty ?? true)
+                              ? 'Vui lòng nhập mật khẩu.'
+                              : null,
+                          onFieldSubmitted: (_) => _onLoginPressed(),
+                          onChanged: _onPasswordChanged,
+                        ),
+                        const SizedBox(height: 24),
+                        LoginStatusSelector(
+                          builder: (status) {
+                            final submitting = status == LoginStatus.submitting;
+                            return FilledButton(
+                              onPressed: submitting ? null : _onLoginPressed,
+                              child: submitting
+                                  ? const AppFilledButtonLoadingIndicator()
+                                  : Text(tr(LocaleKeys.Login)),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextButton(
+                          onPressed: () =>
+                              context.router.pushNamed('/auth/register'),
+                          child: const Text('Chưa có tài khoản? Đăng ký'),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.person),
-                    hintText: tr(LocaleKeys.Username),
-                  ),
-                  onChanged: _onUsernameChanged,
-                ),
-                TextField(
-                  decoration: InputDecoration(
-                    prefixIcon: const Icon(Icons.lock),
-                    hintText: tr(LocaleKeys.Password),
-                  ),
-                  obscureText: true,
-                  onChanged: _onPasswordChanged,
-                ),
-                LoginStatusSelector(builder: (status) {
-                  return FilledButton(
-                    onPressed: _onLoginPressed,
-                    child: status == LoginStatus.submitting
-                        ? const AppFilledButtonLoadingIndicator()
-                        : Text(tr(LocaleKeys.Login)),
-                  );
-                }),
-              ],
+              ),
             ),
           ),
         ),
       ),
     );
+  }
+
+  String? _validateEmail(String? value) {
+    final email = value?.trim() ?? '';
+    if (email.isEmpty ||
+        !email.contains('@') ||
+        !email.split('@').last.contains('.')) {
+      return 'Vui lòng nhập email hợp lệ.';
+    }
+    return null;
   }
 }

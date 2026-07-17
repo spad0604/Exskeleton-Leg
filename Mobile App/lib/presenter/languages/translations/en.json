@@ -2,10 +2,12 @@
   "Errors": {
     "AnUnknownErrorOccurred": "An unknown error occurred",
     "NetworkError": "Please check your internet connection",
-    "InvalidUsernameOrPassword": "Invalid username or password"
+    "InvalidUsernameOrPassword": "Invalid email or password",
+    "EmailAlreadyExists": "This email is already in use",
+    "TermsNotAccepted": "You must accept the terms of use"
   },
   "Hello": "Hello",
-  "Username": "Username",
+  "Username": "Email",
   "Password": "Password",
   "Login": "Login"
 }
