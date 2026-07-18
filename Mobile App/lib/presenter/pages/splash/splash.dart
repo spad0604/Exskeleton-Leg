@@ -53,7 +53,7 @@ class _SplashPageState extends State<SplashPage> {
     authBloc.add(AuthLoggedIn(account));
     await authenticated;
     if (!context.mounted) return;
-    context.router.replaceAll([const HomeRoute()]);
+    context.router.replaceAll([const PatientShellRoute()]);
   }
 
   void _onError(BuildContext context, SplashState state) {

@@ -3,6 +3,7 @@ import 'package:flutter_starter/data/entities/auth_session.dart';
 import 'package:flutter_starter/data/entities/request/login_params.dart';
 import 'package:flutter_starter/data/entities/request/register_params.dart';
 import 'package:flutter_starter/data/entities/account.dart';
+import 'package:flutter_starter/data/entities/patient_home.dart';
 import 'package:flutter_starter/data/sources/network/dio.dart';
 
 @singleton
@@ -34,6 +35,13 @@ class NetworkDataSource {
   Future<Account> getCurrentAccount() async {
     final response = await _dio.get<Map<String, dynamic>>('me');
     return Account.fromJson(_data(response.data));
+  }
+
+  Future<PatientHome> getPatientHome(String patientId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/home',
+    );
+    return PatientHome.fromJson(_data(response.data));
   }
 
   Future<void> logout() async {

@@ -6,7 +6,10 @@ use axum::{
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 use crate::{
-    modules::identity::presentation,
+    modules::{
+        identity::presentation as identity_presentation,
+        patients::presentation as patients_presentation,
+    },
     shared::presentation::{ApiResponse, ApiResult},
 };
 
@@ -25,7 +28,12 @@ pub fn build_router(state: AppState, config: &Config) -> Router {
 
     Router::new()
         .route("/health", get(health))
-        .nest("/api/v1", presentation::routes())
+        .nest(
+            "/api/v1",
+            Router::new()
+                .merge(identity_presentation::routes())
+                .merge(patients_presentation::routes()),
+        )
         .with_state(state)
         .layer(cors)
         .layer(TraceLayer::new_for_http())

@@ -47,7 +47,7 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _onSuccess(BuildContext context, LoginState state) {
-    context.router.replaceAll([const HomeRoute()]);
+    context.router.replaceAll([const PatientShellRoute()]);
   }
 
   void _onError(BuildContext context, LoginState state) {

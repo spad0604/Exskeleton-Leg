@@ -69,7 +69,7 @@ class _RegisterPageState extends State<RegisterPage> {
           authBloc.add(AuthLoggedIn(state.account!));
           await authenticated;
           if (!context.mounted) return;
-          context.router.replaceAll([const HomeRoute()]);
+          context.router.replaceAll([const PatientShellRoute()]);
         } else if (state.status == RegisterStatus.failure) {
           final message = state.error?.message;
           if (message != null) {

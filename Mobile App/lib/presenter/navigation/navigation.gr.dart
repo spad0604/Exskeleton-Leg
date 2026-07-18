@@ -11,6 +11,22 @@
 part of 'navigation.dart';
 
 /// generated route for
+/// [DevicePage]
+class DeviceRoute extends PageRouteInfo<void> {
+  const DeviceRoute({List<PageRouteInfo>? children})
+    : super(DeviceRoute.name, initialChildren: children);
+
+  static const String name = 'DeviceRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const DevicePage();
+    },
+  );
+}
+
+/// generated route for
 /// [HomePage]
 class HomeRoute extends PageRouteInfo<void> {
   const HomeRoute({List<PageRouteInfo>? children})
@@ -43,6 +59,54 @@ class LoginRoute extends PageRouteInfo<void> {
 }
 
 /// generated route for
+/// [PatientShellPage]
+class PatientShellRoute extends PageRouteInfo<void> {
+  const PatientShellRoute({List<PageRouteInfo>? children})
+    : super(PatientShellRoute.name, initialChildren: children);
+
+  static const String name = 'PatientShellRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const PatientShellPage();
+    },
+  );
+}
+
+/// generated route for
+/// [ProfilePage]
+class ProfileRoute extends PageRouteInfo<void> {
+  const ProfileRoute({List<PageRouteInfo>? children})
+    : super(ProfileRoute.name, initialChildren: children);
+
+  static const String name = 'ProfileRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const ProfilePage();
+    },
+  );
+}
+
+/// generated route for
+/// [ProgressPage]
+class ProgressRoute extends PageRouteInfo<void> {
+  const ProgressRoute({List<PageRouteInfo>? children})
+    : super(ProgressRoute.name, initialChildren: children);
+
+  static const String name = 'ProgressRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const ProgressPage();
+    },
+  );
+}
+
+/// generated route for
 /// [RegisterPage]
 class RegisterRoute extends PageRouteInfo<void> {
   const RegisterRoute({List<PageRouteInfo>? children})
@@ -70,6 +134,22 @@ class SplashRoute extends PageRouteInfo<void> {
     name,
     builder: (data) {
       return WrappedRoute(child: SplashPage());
+    },
+  );
+}
+
+/// generated route for
+/// [TrainingPage]
+class TrainingRoute extends PageRouteInfo<void> {
+  const TrainingRoute({List<PageRouteInfo>? children})
+    : super(TrainingRoute.name, initialChildren: children);
+
+  static const String name = 'TrainingRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const TrainingPage();
     },
   );
 }

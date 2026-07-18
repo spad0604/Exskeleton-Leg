@@ -2,6 +2,8 @@ import 'package:auto_route/auto_route.dart';
 import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/presenter/pages/home/home.dart';
 import 'package:flutter_starter/presenter/pages/login/login.dart';
+import 'package:flutter_starter/presenter/pages/patient/patient_placeholders.dart';
+import 'package:flutter_starter/presenter/pages/patient/patient_shell.dart';
 import 'package:flutter_starter/presenter/pages/register/register.dart';
 import 'package:flutter_starter/presenter/pages/splash/splash.dart';
 import 'package:injectable/injectable.dart';
@@ -20,14 +22,32 @@ class AppRouter extends RootStackRouter {
     AutoRoute(path: '/', page: SplashRoute.page),
     AutoRoute(path: '/auth/login', page: LoginRoute.page),
     AutoRoute(path: '/auth/register', page: RegisterRoute.page),
-    AutoRoute(path: '/patient/home', page: HomeRoute.page),
+    AutoRoute(
+      path: '/patient',
+      page: PatientShellRoute.page,
+      children: [
+        AutoRoute(path: 'home', page: HomeRoute.page),
+        AutoRoute(path: 'training', page: TrainingRoute.page),
+        AutoRoute(path: 'progress', page: ProgressRoute.page),
+        AutoRoute(path: 'device', page: DeviceRoute.page),
+        AutoRoute(path: 'profile', page: ProfileRoute.page),
+        RedirectRoute(path: '', redirectTo: 'home'),
+      ],
+    ),
   ];
 
   bool isUnauthorizedRoute(String routeName) =>
       [LoginRoute.name, RegisterRoute.name].contains(routeName);
 
   bool isAuthorizedRoute(String routeName) =>
-      [HomeRoute.name].contains(routeName);
+      [
+        PatientShellRoute.name,
+        HomeRoute.name,
+        TrainingRoute.name,
+        ProgressRoute.name,
+        DeviceRoute.name,
+        ProfileRoute.name,
+      ].contains(routeName);
 
   @override
   List<AutoRouteGuard> get guards => [
@@ -39,7 +59,7 @@ class AppRouter extends RootStackRouter {
       }
 
       if (isUnauthorizedRoute(resolver.routeName) && isAuthenticated) {
-        return resolver.redirect(HomeRoute(), replace: true);
+        return resolver.redirect(const PatientShellRoute(), replace: true);
       }
 
       resolver.next(true);
