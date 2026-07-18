@@ -95,19 +95,12 @@ class _HomeContent extends StatelessWidget {
     final nextPlanItem = data.nextPlanItem;
     final device = data.device;
     final metrics = data.todayMetrics;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
       children: [
-        Text(
-          'Xin chào, ${data.patient.displayName}',
-          style: Theme.of(context).textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Hôm nay mình tập nhẹ và chắc nhé.',
-          style: Theme.of(context).textTheme.bodyLarge,
-        ),
+        _HomeHero(displayName: data.patient.displayName),
         const SizedBox(height: 20),
         _HomeStatusBanner(device: device),
         const SizedBox(height: 20),
@@ -123,6 +116,8 @@ class _HomeContent extends StatelessWidget {
                 icon: Icons.task_alt,
                 value: '${metrics.completedCount} / ${metrics.plannedCount}',
                 label: 'Bài đã tập',
+                background: colorScheme.primaryContainer,
+                foreground: colorScheme.onPrimaryContainer,
               ),
             ),
             const SizedBox(width: 12),
@@ -131,6 +126,8 @@ class _HomeContent extends StatelessWidget {
                 icon: Icons.timer_outlined,
                 value: _minutesLabel(metrics.activeSeconds),
                 label: 'Thời gian',
+                background: colorScheme.secondaryContainer,
+                foreground: colorScheme.onSecondaryContainer,
               ),
             ),
           ],
@@ -140,6 +137,8 @@ class _HomeContent extends StatelessWidget {
           icon: Icons.check_circle_outline,
           value: _ratioLabel(metrics.correctnessRatio),
           label: 'Động tác đạt',
+          background: colorScheme.tertiaryContainer,
+          foreground: colorScheme.onTertiaryContainer,
         ),
         const SizedBox(height: 24),
         Text('Cần chú ý', style: Theme.of(context).textTheme.titleLarge),
@@ -163,6 +162,64 @@ class _HomeContent extends StatelessWidget {
   }
 }
 
+class _HomeHero extends StatelessWidget {
+  final String displayName;
+
+  const _HomeHero({required this.displayName});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: colorScheme.primary,
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Icon(
+              Icons.accessibility_new,
+              color: colorScheme.onPrimary,
+              size: 32,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Xin chào, $displayName',
+                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Hôm nay mình tập nhẹ và chắc nhé.',
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _HomeLoading extends StatelessWidget {
   const _HomeLoading();
 
@@ -181,7 +238,7 @@ class _HomeLoading extends StatelessWidget {
             height: i == 1 ? 160 : 88,
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
             ),
           ),
           const SizedBox(height: 12),
@@ -251,13 +308,17 @@ class _HomeStatusBanner extends StatelessWidget {
       );
     }
 
-    final ready = currentDevice.readiness.state == 'ready' && currentDevice.online;
+    final ready =
+        currentDevice.readiness.state == 'ready' && currentDevice.online;
+    final colorScheme = Theme.of(context).colorScheme;
     return _StatusContainer(
       icon: ready ? Icons.check_circle : Icons.cloud_off,
-      foreground: ready ? const Color(0xFF146C2E) : const Color(0xFF5E5E65),
-      background: ready ? const Color(0xFFC4EED0) : const Color(0xFFE5E1E6),
+      foreground: ready ? colorScheme.secondary : const Color(0xFF5E5E65),
+      background:
+          ready ? colorScheme.secondaryContainer : const Color(0xFFE5E1E6),
       title: ready ? 'Thiết bị đã sẵn sàng' : 'Thiết bị chưa sẵn sàng',
-      message: '${currentDevice.serialNumber} - Pin ${currentDevice.batteryPercent}%',
+      message:
+          '${currentDevice.serialNumber} - Pin ${currentDevice.batteryPercent}%',
     );
   }
 }
@@ -283,12 +344,20 @@ class _StatusContainer extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(22),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: foreground, size: 32),
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: foreground.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: foreground, size: 30),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -320,17 +389,27 @@ class _NextExerciseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
+      color: colorScheme.surface,
+      surfaceTintColor: colorScheme.primary,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                Icon(
-                  Icons.accessibility_new,
-                  color: colorScheme.primary,
-                  size: 32,
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: colorScheme.secondaryContainer,
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Icon(
+                    Icons.accessibility_new,
+                    color: colorScheme.onSecondaryContainer,
+                    size: 32,
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -342,11 +421,25 @@ class _NextExerciseCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            Text(
-              '${planItem.target.sets} hiệp x ${planItem.target.repetitionsPerSet} lần - ${_minutesLabel(planItem.estimatedDurationSeconds)}',
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _PlanChip(
+                  icon: Icons.repeat,
+                  label:
+                      '${planItem.target.sets} hiệp x ${planItem.target.repetitionsPerSet} lần',
+                ),
+                _PlanChip(
+                  icon: Icons.schedule,
+                  label: _minutesLabel(planItem.estimatedDurationSeconds),
+                ),
+                _PlanChip(
+                  icon: Icons.tune,
+                  label: 'Hỗ trợ ${_assistanceLabel(planItem.assistanceLevel)}',
+                ),
+              ],
             ),
-            const SizedBox(height: 4),
-            Text('Mức hỗ trợ: ${_assistanceLabel(planItem.assistanceLevel)}'),
             const SizedBox(height: 16),
             SizedBox(
               width: double.infinity,
@@ -374,12 +467,32 @@ class _NextExerciseCard extends StatelessWidget {
   }
 }
 
+class _PlanChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _PlanChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Chip(
+      avatar: Icon(icon, size: 18, color: colorScheme.primary),
+      label: Text(label),
+      backgroundColor: colorScheme.surfaceContainerHighest,
+      side: BorderSide.none,
+    );
+  }
+}
+
 class _EmptyPlanCard extends StatelessWidget {
   const _EmptyPlanCard();
 
   @override
   Widget build(BuildContext context) {
     return Card(
+      color: Theme.of(context).colorScheme.secondaryContainer,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -387,7 +500,9 @@ class _EmptyPlanCard extends StatelessWidget {
           children: [
             Text(
               'Hôm nay chưa có bài tập',
-              style: Theme.of(context).textTheme.titleLarge,
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
             ),
             const SizedBox(height: 8),
             const Text('Bạn có thể xem danh sách bài tập đã được duyệt.'),
@@ -408,32 +523,39 @@ class _TodayMetric extends StatelessWidget {
   final IconData icon;
   final String value;
   final String label;
+  final Color background;
+  final Color foreground;
 
   const _TodayMetric({
     required this.icon,
     required this.value,
     required this.label,
+    required this.background,
+    required this.foreground,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: background,
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: colorScheme.primary),
+          Icon(icon, color: foreground),
           const SizedBox(height: 12),
-          Text(value, style: Theme.of(context).textTheme.titleLarge),
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
           const SizedBox(height: 4),
-          Text(label),
+          Text(label, style: TextStyle(color: foreground)),
         ],
       ),
     );
@@ -451,7 +573,7 @@ class _AlertPreview extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: const Color(0xFFFFE08A),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
         children: [
@@ -477,7 +599,7 @@ class _NoAlertPreview extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: const Row(

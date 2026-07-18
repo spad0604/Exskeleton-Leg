@@ -26,10 +26,7 @@ abstract class RegisterModule {
 
   @Named('baseUrl')
   @singleton
-  String get baseUrl => const String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080/api/v1/',
-  );
+  String get baseUrl => 'http://192.168.100.153:8080/api/v1/';
 }
 
 class GlobalBlocProviders extends StatelessWidget {

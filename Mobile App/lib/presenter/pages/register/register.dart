@@ -7,6 +7,7 @@ import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/di.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
+import 'package:flutter_starter/presenter/pages/auth_widgets.dart';
 import 'package:flutter_starter/presenter/pages/register/register_cubit.dart';
 
 @RoutePage()
@@ -57,6 +58,14 @@ class _RegisterPageState extends State<RegisterPage> {
         );
   }
 
+  void _onSocialPressed(String providerName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('$providerName sẽ được hỗ trợ trong bản tiếp theo.'),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<RegisterCubit, RegisterState>(
@@ -87,119 +96,139 @@ class _RegisterPageState extends State<RegisterPage> {
               padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 480),
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        'Bắt đầu tập luyện an toàn',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        'Tài khoản mới được tạo với vai trò người tập.',
-                        style: Theme.of(context).textTheme.bodyLarge,
-                      ),
-                      const SizedBox(height: 24),
-                      TextFormField(
-                        controller: _displayNameController,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.name],
-                        decoration: const InputDecoration(
-                          labelText: 'Họ và tên',
-                          prefixIcon: Icon(Icons.person_outline),
-                        ),
-                        validator: (value) => (value?.trim().length ?? 0) < 2
-                            ? 'Vui lòng nhập họ và tên.'
-                            : null,
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _emailController,
-                        keyboardType: TextInputType.emailAddress,
-                        textInputAction: TextInputAction.next,
-                        autofillHints: const [AutofillHints.email],
-                        decoration: const InputDecoration(
-                          labelText: 'Email',
-                          prefixIcon: Icon(Icons.email_outlined),
-                        ),
-                        validator: (value) {
-                          final email = value?.trim() ?? '';
-                          return email.contains('@') &&
-                                  email.split('@').last.contains('.')
-                              ? null
-                              : 'Vui lòng nhập email hợp lệ.';
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _passwordController,
-                        obscureText: _obscurePassword,
-                        textInputAction: TextInputAction.done,
-                        autofillHints: const [AutofillHints.newPassword],
-                        decoration: InputDecoration(
-                          labelText: 'Mật khẩu',
-                          prefixIcon: const Icon(Icons.lock_outline),
-                          helperText: 'Từ 8 đến 128 ký tự.',
-                          suffixIcon: IconButton(
-                            tooltip: _obscurePassword
-                                ? 'Hiện mật khẩu'
-                                : 'Ẩn mật khẩu',
-                            onPressed: () => setState(() {
-                              _obscurePassword = !_obscurePassword;
-                            }),
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_outlined
-                                  : Icons.visibility_off_outlined,
-                            ),
-                          ),
-                        ),
-                        validator: (value) {
-                          final length = value?.characters.length ?? 0;
-                          return length < 8 || length > 128
-                              ? 'Mật khẩu cần từ 8 đến 128 ký tự.'
-                              : null;
-                        },
-                        onFieldSubmitted: (_) => _submit(),
-                      ),
-                      const SizedBox(height: 12),
-                      CheckboxListTile(
-                        contentPadding: EdgeInsets.zero,
-                        controlAffinity: ListTileControlAffinity.leading,
-                        value: _acceptedTerms,
-                        onChanged: (value) => setState(() {
-                          _acceptedTerms = value ?? false;
-                        }),
-                        title: const Text(
-                          'Tôi đã đọc và đồng ý với điều khoản sử dụng phiên bản 2026-01.',
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      BlocBuilder<RegisterCubit, RegisterState>(
-                        builder: (context, state) {
-                          final submitting =
-                              state.status == RegisterStatus.submitting;
-                          return FilledButton(
-                            onPressed: submitting ? null : _submit,
-                            child: submitting
-                                ? const SizedBox.square(
-                                    dimension: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                    ),
-                                  )
-                                : const Text('Đăng ký'),
-                          );
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      TextButton(
-                        onPressed: () => context.router.maybePop(),
-                        child: const Text('Đã có tài khoản? Đăng nhập'),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Theme.of(context)
+                            .colorScheme
+                            .shadow
+                            .withValues(alpha: 0.08),
+                        offset: const Offset(0, 18),
+                        blurRadius: 44,
                       ),
                     ],
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Form(
+                      key: _formKey,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          const AuthHeader(
+                            icon: Icons.health_and_safety_outlined,
+                            title: 'Bắt đầu tập luyện an toàn',
+                            subtitle:
+                                'Tài khoản mới được tạo với vai trò người tập.',
+                          ),
+                          const SizedBox(height: 30),
+                          AuthTextFormField(
+                            label: 'Họ và tên',
+                            hintText: 'Nguyễn An',
+                            prefixIcon: Icons.person_outline,
+                            controller: _displayNameController,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.name],
+                            validator: (value) =>
+                                (value?.trim().length ?? 0) < 2
+                                    ? 'Vui lòng nhập họ và tên.'
+                                    : null,
+                          ),
+                          const SizedBox(height: 18),
+                          AuthTextFormField(
+                            label: 'Email',
+                            hintText: 'user@example.com',
+                            prefixIcon: Icons.email_outlined,
+                            controller: _emailController,
+                            keyboardType: TextInputType.emailAddress,
+                            textInputAction: TextInputAction.next,
+                            autofillHints: const [AutofillHints.email],
+                            validator: (value) {
+                              final email = value?.trim() ?? '';
+                              return email.contains('@') &&
+                                      email.split('@').last.contains('.')
+                                  ? null
+                                  : 'Vui lòng nhập email hợp lệ.';
+                            },
+                          ),
+                          const SizedBox(height: 18),
+                          AuthTextFormField(
+                            label: 'Mật khẩu',
+                            hintText: 'Tạo mật khẩu',
+                            prefixIcon: Icons.lock_outline,
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
+                            textInputAction: TextInputAction.done,
+                            autofillHints: const [AutofillHints.newPassword],
+                            helperText: 'Từ 8 đến 128 ký tự.',
+                            suffixIcon: IconButton(
+                              tooltip: _obscurePassword
+                                  ? 'Hiện mật khẩu'
+                                  : 'Ẩn mật khẩu',
+                              onPressed: () => setState(() {
+                                _obscurePassword = !_obscurePassword;
+                              }),
+                              icon: Icon(
+                                _obscurePassword
+                                    ? Icons.visibility_outlined
+                                    : Icons.visibility_off_outlined,
+                              ),
+                            ),
+                            validator: (value) {
+                              final length = value?.characters.length ?? 0;
+                              return length < 8 || length > 128
+                                  ? 'Mật khẩu cần từ 8 đến 128 ký tự.'
+                                  : null;
+                            },
+                            onFieldSubmitted: (_) => _submit(),
+                          ),
+                          const SizedBox(height: 12),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            controlAffinity: ListTileControlAffinity.leading,
+                            value: _acceptedTerms,
+                            onChanged: (value) => setState(() {
+                              _acceptedTerms = value ?? false;
+                            }),
+                            title: const Text(
+                              'Tôi đã đọc và đồng ý với điều khoản sử dụng phiên bản 2026-01.',
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          BlocBuilder<RegisterCubit, RegisterState>(
+                            builder: (context, state) {
+                              final submitting =
+                                  state.status == RegisterStatus.submitting;
+                              return FilledButton(
+                                onPressed: submitting ? null : _submit,
+                                child: submitting
+                                    ? const SizedBox.square(
+                                        dimension: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                        ),
+                                      )
+                                    : const Text('Đăng ký'),
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 24),
+                          SocialAuthButtons(
+                            onGooglePressed: () => _onSocialPressed('Google'),
+                            onFacebookPressed: () =>
+                                _onSocialPressed('Facebook'),
+                          ),
+                          const SizedBox(height: 14),
+                          TextButton(
+                            onPressed: () => context.router.maybePop(),
+                            child: const Text('Đã có tài khoản? Đăng nhập'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ),

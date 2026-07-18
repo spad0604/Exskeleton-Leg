@@ -42,10 +42,10 @@ extension GetItInjectableX on _i174.GetIt {
       environmentFilter,
     );
     final registerModule = _$RegisterModule();
+    gh.singleton<_i963.AuthBloc>(() => _i963.AuthBloc());
+    gh.singleton<_i932.SettingsBloc>(() => _i932.SettingsBloc());
     gh.singleton<_i558.FlutterSecureStorage>(
         () => registerModule.flutterSecureStorage);
-    gh.singleton<_i932.SettingsBloc>(() => _i932.SettingsBloc());
-    gh.singleton<_i963.AuthBloc>(() => _i963.AuthBloc());
     gh.singleton<_i132.OauthTokenManager>(() => _i290.DefaultOauthTokenManager(
         flutterSecureStorage: gh<_i558.FlutterSecureStorage>()));
     gh.singleton<_i551.AppRouter>(

@@ -21,40 +21,168 @@ class PatientShellPage extends StatelessWidget {
 
         return Scaffold(
           body: child,
-          bottomNavigationBar: NavigationBar(
+          bottomNavigationBar: _PatientNavigationBar(
             selectedIndex: tabsRouter.activeIndex,
-            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
-            onDestinationSelected: tabsRouter.setActiveIndex,
-            destinations: const [
-              NavigationDestination(
-                icon: Icon(Icons.home_outlined),
-                selectedIcon: Icon(Icons.home),
-                label: 'Hôm nay',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.fitness_center_outlined),
-                selectedIcon: Icon(Icons.fitness_center),
-                label: 'Bài tập',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.monitoring_outlined),
-                selectedIcon: Icon(Icons.monitoring),
-                label: 'Tiến độ',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.settings_remote_outlined),
-                selectedIcon: Icon(Icons.settings_remote),
-                label: 'Thiết bị',
-              ),
-              NavigationDestination(
-                icon: Icon(Icons.person_outline),
-                selectedIcon: Icon(Icons.person),
-                label: 'Cá nhân',
-              ),
-            ],
+            onSelected: tabsRouter.setActiveIndex,
           ),
         );
       },
     );
   }
+}
+
+class _PatientNavigationBar extends StatelessWidget {
+  final int selectedIndex;
+  final ValueChanged<int> onSelected;
+
+  const _PatientNavigationBar({
+    required this.selectedIndex,
+    required this.onSelected,
+  });
+
+  static const _items = [
+    _PatientNavigationItem(
+      assetPath: 'assets/images/ic_home.png',
+      label: 'Hôm nay',
+    ),
+    _PatientNavigationItem(
+      assetPath: 'assets/images/ic_calendar.png',
+      label: 'Bài tập',
+    ),
+    _PatientNavigationItem(
+      assetPath: 'assets/images/ic_clock.png',
+      label: 'Tiến độ',
+    ),
+    _PatientNavigationItem(
+      assetPath: 'assets/images/ic_fill_setting.png',
+      label: 'Thiết bị',
+    ),
+    _PatientNavigationItem(
+      assetPath: 'assets/images/ic_account.png',
+      label: 'Cá nhân',
+    ),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Material(
+          color: Colors.white,
+          elevation: 12,
+          shadowColor: colorScheme.primary.withValues(alpha: 0.16),
+          borderRadius: BorderRadius.circular(30),
+          child: Container(
+            height: 78,
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(30),
+              border: Border.all(
+                color: colorScheme.outlineVariant.withValues(alpha: 0.55),
+              ),
+            ),
+            child: Row(
+              children: [
+                for (final entry in _items.indexed)
+                  Expanded(
+                    child: _PatientNavigationButton(
+                      item: entry.$2,
+                      selected: selectedIndex == entry.$1,
+                      onTap: () => onSelected(entry.$1),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PatientNavigationButton extends StatelessWidget {
+  final _PatientNavigationItem item;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _PatientNavigationButton({
+    required this.item,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final foreground =
+        selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant;
+
+    return Tooltip(
+      message: item.label,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 220),
+          curve: Curves.easeOutCubic,
+          margin: const EdgeInsets.symmetric(horizontal: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+          decoration: BoxDecoration(
+            color: selected ? colorScheme.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: colorScheme.primary.withValues(alpha: 0.22),
+                      blurRadius: 12,
+                      offset: const Offset(0, 5),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              ImageIcon(
+                AssetImage(item.assetPath),
+                color: foreground,
+                size: selected ? 22 : 21,
+              ),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  item.label,
+                  maxLines: 1,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: foreground,
+                        fontSize: 10.5,
+                        height: 1.1,
+                        letterSpacing: 0,
+                        fontWeight:
+                            selected ? FontWeight.w800 : FontWeight.w600,
+                      ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PatientNavigationItem {
+  final String assetPath;
+  final String label;
+
+  const _PatientNavigationItem({
+    required this.assetPath,
+    required this.label,
+  });
 }

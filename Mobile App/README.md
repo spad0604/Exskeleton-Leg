@@ -24,7 +24,7 @@ A new Flutter project.
 
 ```bash
 flutter run --flavor=dev -t lib/main_dev.dart \
-  --dart-define=API_BASE_URL=http://10.0.2.2:8080/api/v1/
+  --dart-define=API_BASE_URL=http://192.168.100.153:8080/api/v1/
 ```
 
 - Run `flutter run --flavor=staging -t lib/main_staging.dart` to run the app in staging environment.

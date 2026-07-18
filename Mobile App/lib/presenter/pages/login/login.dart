@@ -5,6 +5,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/di.dart';
 import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
+import 'package:flutter_starter/presenter/pages/auth_widgets.dart';
 import 'package:flutter_starter/presenter/pages/login/login_bloc.dart';
 import 'package:flutter_starter/presenter/pages/login/login_event.dart';
 import 'package:flutter_starter/presenter/pages/login/login_selector.dart';
@@ -46,6 +47,13 @@ class _LoginPageState extends State<LoginPage> {
     _bloc.add(const LoginStarted());
   }
 
+  void _onSocialPressed(String providerName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('$providerName sẽ được hỗ trợ trong bản tiếp theo.')),
+    );
+  }
+
   void _onSuccess(BuildContext context, LoginState state) {
     context.router.replaceAll([const PatientShellRoute()]);
   }
@@ -80,86 +88,99 @@ class _LoginPageState extends State<LoginPage> {
                 child: AutofillGroup(
                   child: Form(
                     key: _formKey,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        Icon(
-                          Icons.accessibility_new_rounded,
-                          size: 56,
-                          color: Theme.of(context).colorScheme.primary,
-                          semanticLabel: 'Exoskeleton Leg',
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Chào mừng trở lại',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.headlineSmall,
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          'Đăng nhập để tiếp tục chương trình tập của bạn.',
-                          textAlign: TextAlign.center,
-                          style: Theme.of(context).textTheme.bodyLarge,
-                        ),
-                        const SizedBox(height: 32),
-                        TextFormField(
-                          keyboardType: TextInputType.emailAddress,
-                          autofillHints: const [AutofillHints.email],
-                          textInputAction: TextInputAction.next,
-                          decoration: const InputDecoration(
-                            prefixIcon: Icon(Icons.email_outlined),
-                            labelText: 'Email',
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(28),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Theme.of(context)
+                                .colorScheme
+                                .shadow
+                                .withValues(alpha: 0.08),
+                            offset: const Offset(0, 18),
+                            blurRadius: 44,
                           ),
-                          validator: _validateEmail,
-                          onChanged: _onUsernameChanged,
-                        ),
-                        const SizedBox(height: 16),
-                        TextFormField(
-                          autofillHints: const [AutofillHints.password],
-                          textInputAction: TextInputAction.done,
-                          decoration: InputDecoration(
-                            prefixIcon: const Icon(Icons.lock_outline),
-                            labelText: tr(LocaleKeys.Password),
-                            suffixIcon: IconButton(
-                              tooltip: _obscurePassword
-                                  ? 'Hiện mật khẩu'
-                                  : 'Ẩn mật khẩu',
-                              onPressed: () => setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              }),
-                              icon: Icon(
-                                _obscurePassword
-                                    ? Icons.visibility_outlined
-                                    : Icons.visibility_off_outlined,
-                              ),
+                        ],
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            const AuthHeader(
+                              icon: Icons.accessibility_new_rounded,
+                              title: 'Chào mừng trở lại',
+                              subtitle:
+                                  'Đăng nhập để tiếp tục chương trình tập của bạn.',
                             ),
-                          ),
-                          obscureText: _obscurePassword,
-                          validator: (value) => (value?.isEmpty ?? true)
-                              ? 'Vui lòng nhập mật khẩu.'
-                              : null,
-                          onFieldSubmitted: (_) => _onLoginPressed(),
-                          onChanged: _onPasswordChanged,
+                            const SizedBox(height: 30),
+                            AuthTextFormField(
+                              label: 'Email',
+                              hintText: 'user@example.com',
+                              prefixIcon: Icons.email_outlined,
+                              keyboardType: TextInputType.emailAddress,
+                              autofillHints: const [AutofillHints.email],
+                              textInputAction: TextInputAction.next,
+                              validator: _validateEmail,
+                              onChanged: _onUsernameChanged,
+                            ),
+                            const SizedBox(height: 18),
+                            AuthTextFormField(
+                              label: tr(LocaleKeys.Password),
+                              hintText: 'Nhập mật khẩu',
+                              prefixIcon: Icons.lock_outline,
+                              autofillHints: const [AutofillHints.password],
+                              textInputAction: TextInputAction.done,
+                              suffixIcon: IconButton(
+                                tooltip: _obscurePassword
+                                    ? 'Hiện mật khẩu'
+                                    : 'Ẩn mật khẩu',
+                                onPressed: () => setState(() {
+                                  _obscurePassword = !_obscurePassword;
+                                }),
+                                icon: Icon(
+                                  _obscurePassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                              obscureText: _obscurePassword,
+                              validator: (value) => (value?.isEmpty ?? true)
+                                  ? 'Vui lòng nhập mật khẩu.'
+                                  : null,
+                              onFieldSubmitted: (_) => _onLoginPressed(),
+                              onChanged: _onPasswordChanged,
+                            ),
+                            const SizedBox(height: 26),
+                            LoginStatusSelector(
+                              builder: (status) {
+                                final submitting =
+                                    status == LoginStatus.submitting;
+                                return FilledButton(
+                                  onPressed:
+                                      submitting ? null : _onLoginPressed,
+                                  child: submitting
+                                      ? const AppFilledButtonLoadingIndicator()
+                                      : Text(tr(LocaleKeys.Login)),
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 24),
+                            SocialAuthButtons(
+                              onGooglePressed: () => _onSocialPressed('Google'),
+                              onFacebookPressed: () =>
+                                  _onSocialPressed('Facebook'),
+                            ),
+                            const SizedBox(height: 14),
+                            TextButton(
+                              onPressed: () =>
+                                  context.router.pushNamed('/auth/register'),
+                              child: const Text('Chưa có tài khoản? Đăng ký'),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 24),
-                        LoginStatusSelector(
-                          builder: (status) {
-                            final submitting = status == LoginStatus.submitting;
-                            return FilledButton(
-                              onPressed: submitting ? null : _onLoginPressed,
-                              child: submitting
-                                  ? const AppFilledButtonLoadingIndicator()
-                                  : Text(tr(LocaleKeys.Login)),
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        TextButton(
-                          onPressed: () =>
-                              context.router.pushNamed('/auth/register'),
-                          child: const Text('Chưa có tài khoản? Đăng ký'),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
