@@ -1,5 +1,7 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
 
 @RoutePage()
@@ -43,23 +45,23 @@ class _PatientNavigationBar extends StatelessWidget {
   static const _items = [
     _PatientNavigationItem(
       assetPath: 'assets/images/ic_home.png',
-      label: 'Hôm nay',
+      labelKey: LocaleKeys.Patient_Tabs_Today,
     ),
     _PatientNavigationItem(
       assetPath: 'assets/images/ic_calendar.png',
-      label: 'Bài tập',
+      labelKey: LocaleKeys.Patient_Tabs_Training,
     ),
     _PatientNavigationItem(
       assetPath: 'assets/images/ic_clock.png',
-      label: 'Tiến độ',
+      labelKey: LocaleKeys.Patient_Tabs_Progress,
     ),
     _PatientNavigationItem(
       assetPath: 'assets/images/ic_fill_setting.png',
-      label: 'Thiết bị',
+      labelKey: LocaleKeys.Patient_Tabs_Device,
     ),
     _PatientNavigationItem(
       assetPath: 'assets/images/ic_account.png',
-      label: 'Cá nhân',
+      labelKey: LocaleKeys.Patient_Tabs_Profile,
     ),
   ];
 
@@ -121,9 +123,10 @@ class _PatientNavigationButton extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final foreground =
         selected ? colorScheme.onPrimary : colorScheme.onSurfaceVariant;
+    final label = item.labelKey.tr();
 
     return Tooltip(
-      message: item.label,
+      message: label,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(22),
@@ -157,7 +160,7 @@ class _PatientNavigationButton extends StatelessWidget {
               FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Text(
-                  item.label,
+                  label,
                   maxLines: 1,
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: foreground,
@@ -179,10 +182,10 @@ class _PatientNavigationButton extends StatelessWidget {
 
 class _PatientNavigationItem {
   final String assetPath;
-  final String label;
+  final String labelKey;
 
   const _PatientNavigationItem({
     required this.assetPath,
-    required this.label,
+    required this.labelKey,
   });
 }

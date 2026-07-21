@@ -1,10 +1,15 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/data/repositories/auth_repository/auth_repository.dart';
 import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/data/states/auth/auth_event.dart';
+import 'package:flutter_starter/data/sources/network/network.dart';
 import 'package:flutter_starter/di.dart';
+import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
+import 'package:flutter_starter/services/cloudinary/cloudinary_upload_service.dart';
+import 'package:image_picker/image_picker.dart';
 
 @RoutePage()
 class TrainingPage extends StatelessWidget {
@@ -12,49 +17,40 @@ class TrainingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _PatientTabScaffold(
-      title: 'Bài tập',
-      actions: [
-        IconButton(
-          tooltip: 'Lọc bài tập',
-          onPressed: () {},
-          icon: const Icon(Icons.filter_list),
-        ),
-      ],
-      children: [
+    final patientId = context.read<AuthBloc>().state.account?.id;
+    return _PatientApiView<List<Map<String, dynamic>>>(
+      title: LocaleKeys.Patient_Tabs_Training.tr(),
+      load: () =>
+          provider.get<NetworkDataSource>().getTodayPlanItems(patientId!),
+      builder: (items) => [
         const _TrainingHero(),
         const SizedBox(height: 16),
-        const _SegmentHeader(labels: ['Hôm nay', 'Tất cả']),
+        _SegmentHeader(labels: [
+          LocaleKeys.Patient_Training_Today.tr(),
+          LocaleKeys.Patient_Training_All.tr(),
+        ]),
         const SizedBox(height: 16),
-        _ExerciseCard(
-          title: 'Đứng lên và ngồi xuống',
-          subtitle: '2 hiệp x 8 lần',
-          meta: 'Khoảng 10 phút',
-          chip: 'Hôm nay',
-          icon: Icons.accessibility_new,
-          accent: _AccentTone.primary,
-          progress: 0.72,
-        ),
-        const SizedBox(height: 12),
-        _ExerciseCard(
-          title: 'Nâng gối có hỗ trợ',
-          subtitle: '3 hiệp x 6 lần mỗi bên',
-          meta: 'Hỗ trợ thấp',
-          chip: 'Cần thiết bị',
-          icon: Icons.directions_walk,
-          accent: _AccentTone.secondary,
-          progress: 0.45,
-        ),
-        const SizedBox(height: 12),
-        _ExerciseCard(
-          title: 'Duỗi hông chậm',
-          subtitle: 'Giữ 5 giây mỗi lần',
-          meta: 'Tập kiểm soát',
-          chip: 'Tất cả',
-          icon: Icons.self_improvement,
-          accent: _AccentTone.tertiary,
-          progress: 0.28,
-        ),
+        for (final item in items) ...[
+          _ExerciseCard(
+            title: (item['exercise'] as Map)['name'] as String,
+            subtitle: LocaleKeys.Common_SetsReps.tr(
+              args: [
+                '${(item['target'] as Map)['sets']}',
+                '${(item['target'] as Map)['repetitions_per_set']}',
+              ],
+            ),
+            meta: LocaleKeys.Common_ApproxMinutes.tr(
+              args: [
+                '${((item['estimated_duration_seconds'] as num) / 60).round()}',
+              ],
+            ),
+            chip: LocaleKeys.Patient_Training_Today.tr(),
+            icon: Icons.accessibility_new,
+            accent: _AccentTone.primary,
+            progress: 0,
+          ),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
@@ -66,21 +62,25 @@ class ProgressPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return _PatientTabScaffold(
-      title: 'Tiến độ',
-      children: [
+    final patientId = context.read<AuthBloc>().state.account?.id;
+    return _PatientApiView<Map<String, dynamic>>(
+      title: LocaleKeys.Patient_Tabs_Progress.tr(),
+      load: () =>
+          provider.get<NetworkDataSource>().getProgressOverview(patientId!),
+      builder: (data) => [
         const _ProgressHero(),
         const SizedBox(height: 16),
-        const _SegmentHeader(labels: ['Tuần', 'Tháng']),
+        _SegmentHeader(labels: [
+          LocaleKeys.Patient_Progress_Week.tr(),
+          LocaleKeys.Patient_Progress_Month.tr(),
+        ]),
         const SizedBox(height: 16),
-        const Row(
+        Row(
           children: [
             Expanded(
               child: _MetricCard(
-                label: 'Hoàn thành',
-                value: '6 / 8',
+                label: LocaleKeys.Patient_Progress_Completed.tr(),
+                value: '${data['completed_count']} / ${data['planned_count']}',
                 assetPath: 'assets/images/ic_calendar.png',
                 accent: _AccentTone.primary,
               ),
@@ -88,8 +88,10 @@ class ProgressPage extends StatelessWidget {
             SizedBox(width: 12),
             Expanded(
               child: _MetricCard(
-                label: 'Thời gian',
-                value: '54 phút',
+                label: LocaleKeys.Patient_Progress_TrainingTime.tr(),
+                value: LocaleKeys.Common_Minutes.tr(args: [
+                  '${((data['active_seconds'] as num) / 60).round()}',
+                ]),
                 assetPath: 'assets/images/ic_clock.png',
                 accent: _AccentTone.tertiary,
               ),
@@ -97,38 +99,31 @@ class ProgressPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        const _MetricCard(
-          label: 'Động tác đạt',
-          value: '81%',
+        _MetricCard(
+          label: LocaleKeys.Patient_Progress_CorrectMoves.tr(),
+          value: '${((data['correctness_ratio'] as num) * 100).round()}%',
           assetPath: 'assets/images/ic_heart_circle.png',
           accent: _AccentTone.neutral,
         ),
         const SizedBox(height: 24),
-        Text('Xu hướng', style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 12),
-        Container(
-          height: 168,
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            color: colorScheme.secondaryContainer,
-            borderRadius: BorderRadius.circular(24),
-          ),
-          child: CustomPaint(
-            painter: _TrendPainter(colorScheme.secondary),
-            child: const SizedBox.expand(),
-          ),
-        ),
+        Text(
+            LocaleKeys.Patient_Progress_StreakDays.tr(
+              args: ['${data['streak_days']}'],
+            ),
+            style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 24),
-        Text('Lịch sử gần đây', style: Theme.of(context).textTheme.titleLarge),
+        Text(LocaleKeys.Patient_Progress_RecentHistory.tr(),
+            style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
-        const _SessionTile(
-          title: 'Đứng lên và ngồi xuống',
-          subtitle: 'Hôm nay - Hoàn thành 15 / 16 lần',
+        _SessionTile(
+          title: LocaleKeys.Patient_Progress_SessionSitStand.tr(),
+          subtitle: LocaleKeys.Patient_Progress_SessionSitStandSubtitle.tr(),
           icon: Icons.done,
         ),
-        const _SessionTile(
-          title: 'Duỗi hông chậm',
-          subtitle: 'Hôm qua - Buổi tập đã dừng an toàn',
+        _SessionTile(
+          title: LocaleKeys.Patient_Progress_SessionHipExtension.tr(),
+          subtitle:
+              LocaleKeys.Patient_Progress_SessionHipExtensionSubtitle.tr(),
           icon: Icons.report_gmailerrorred_outlined,
         ),
       ],
@@ -142,85 +137,285 @@ class DevicePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final patientId = context.read<AuthBloc>().state.account?.id;
+    return _PatientApiView<List<Map<String, dynamic>>>(
+      title: LocaleKeys.Patient_Tabs_Device.tr(),
+      load: () => provider.get<NetworkDataSource>().getDevices(patientId!),
+      builder: (items) {
+        if (items.isEmpty) {
+          return [Center(child: Text(LocaleKeys.Patient_Device_NoDevice.tr()))];
+        }
+        final device = items.first;
+        return [
+          const _DeviceHero(),
+          const SizedBox(height: 16),
+          _StatusBanner(
+            assetPath: 'assets/images/ic_fill_setting.png',
+            title: (device['readiness'] as Map)['state'] == 'ready'
+                ? LocaleKeys.Patient_Device_Ready.tr()
+                : LocaleKeys.Patient_Device_NeedsCheck.tr(),
+            message: LocaleKeys.Patient_Device_Battery.tr(args: [
+              '${device['serial_number']}',
+              '${device['battery_percent']}',
+            ]),
+            tone: _StatusTone.ready,
+          ),
+          const SizedBox(height: 16),
+          _InfoTile(
+            assetPath: 'assets/images/ic_fill_setting.png',
+            title: device['model'] as String,
+            subtitle: LocaleKeys.Patient_Device_Firmware.tr(args: [
+              '${device['firmware_version']}',
+            ]),
+          ),
+          _InfoTile(
+            assetPath: 'assets/images/ic_heart_circle.png',
+            title: LocaleKeys.Patient_Device_SensorsStable.tr(),
+            subtitle: LocaleKeys.Patient_Device_SensorsStableSubtitle.tr(),
+          ),
+          _InfoTile(
+            assetPath: 'assets/images/ic_clock.png',
+            title: LocaleKeys.Patient_Device_CalibrationValid.tr(),
+            subtitle: LocaleKeys.Patient_Device_CalibrationExpiry.tr(),
+          ),
+          const SizedBox(height: 16),
+          _ActionRow(
+            primaryLabel: LocaleKeys.Patient_Device_Calibrate.tr(),
+            secondaryLabel: LocaleKeys.Patient_Device_Diagnostics.tr(),
+            primaryIcon: Icons.straighten,
+            secondaryIcon: Icons.fact_check_outlined,
+          ),
+        ];
+      },
+    );
+  }
+}
+
+class _PatientApiView<T> extends StatefulWidget {
+  final String title;
+  final Future<T> Function() load;
+  final List<Widget> Function(T data) builder;
+  const _PatientApiView(
+      {required this.title, required this.load, required this.builder});
+  @override
+  State<_PatientApiView<T>> createState() => _PatientApiViewState<T>();
+}
+
+class _PatientApiViewState<T> extends State<_PatientApiView<T>> {
+  late Future<T> _future;
+  @override
+  void initState() {
+    super.initState();
+    _future = widget.load();
+  }
+
+  void _retry() => setState(() => _future = widget.load());
+  @override
+  Widget build(BuildContext context) => FutureBuilder<T>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Scaffold(
+                appBar: AppBar(title: Text(widget.title)),
+                body: const Center(child: CircularProgressIndicator()));
+          }
+          if (snapshot.hasError || !snapshot.hasData) {
+            return Scaffold(
+                appBar: AppBar(title: Text(widget.title)),
+                body: Center(
+                    child: FilledButton.icon(
+                        onPressed: _retry,
+                        icon: const Icon(Icons.refresh),
+                        label: Text(LocaleKeys.Common_Retry.tr()))));
+          }
+          return _PatientTabScaffold(
+              title: widget.title,
+              children: widget.builder(snapshot.data as T));
+        },
+      );
+}
+
+class PatientNotificationsPage extends StatelessWidget {
+  const PatientNotificationsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final items = [
+      _NotificationItem(
+        icon: Icons.warning_amber_rounded,
+        title: LocaleKeys.Patient_Notifications_SafetyTitle.tr(),
+        body: LocaleKeys.Patient_Notifications_SafetyBody.tr(),
+        time: LocaleKeys.Patient_Notifications_SafetyTime.tr(),
+        tone: _AccentTone.tertiary,
+        unread: true,
+      ),
+      _NotificationItem(
+        icon: Icons.fitness_center,
+        title: LocaleKeys.Patient_Notifications_TrainingTitle.tr(),
+        body: LocaleKeys.Patient_Notifications_TrainingBody.tr(),
+        time: LocaleKeys.Patient_Notifications_TrainingTime.tr(),
+        tone: _AccentTone.primary,
+        unread: true,
+      ),
+      _NotificationItem(
+        icon: Icons.battery_charging_full,
+        title: LocaleKeys.Patient_Notifications_DeviceTitle.tr(),
+        body: LocaleKeys.Patient_Notifications_DeviceBody.tr(),
+        time: LocaleKeys.Patient_Notifications_DeviceTime.tr(),
+        tone: _AccentTone.secondary,
+        unread: false,
+      ),
+      _NotificationItem(
+        icon: Icons.groups_outlined,
+        title: LocaleKeys.Patient_Notifications_CareTitle.tr(),
+        body: LocaleKeys.Patient_Notifications_CareBody.tr(),
+        time: LocaleKeys.Patient_Notifications_CareTime.tr(),
+        tone: _AccentTone.neutral,
+        unread: false,
+      ),
+    ];
+
     return _PatientTabScaffold(
-      title: 'Thiết bị',
-      children: const [
-        _DeviceHero(),
-        SizedBox(height: 16),
-        _StatusBanner(
-          assetPath: 'assets/images/ic_fill_setting.png',
-          title: 'Thiết bị đã sẵn sàng',
-          message: 'EXO-2026-000123 - Pin 78%',
-          tone: _StatusTone.ready,
-        ),
-        SizedBox(height: 16),
-        _InfoTile(
-          assetPath: 'assets/images/ic_fill_setting.png',
-          title: 'Exoskeleton Leg v1',
-          subtitle: 'Firmware 1.2.0 - Kết nối 08:00',
-        ),
-        _InfoTile(
-          assetPath: 'assets/images/ic_heart_circle.png',
-          title: 'Cảm biến hoạt động ổn định',
-          subtitle: 'Hông trái/phải, gối trái/phải đều sẵn sàng',
-        ),
-        _InfoTile(
-          assetPath: 'assets/images/ic_clock.png',
-          title: 'Hiệu chỉnh còn hiệu lực',
-          subtitle: 'Hết hạn sau 31 ngày',
-        ),
-        SizedBox(height: 16),
-        _ActionRow(
-          primaryLabel: 'Hiệu chỉnh',
-          secondaryLabel: 'Chẩn đoán',
-          primaryIcon: Icons.straighten,
-          secondaryIcon: Icons.fact_check_outlined,
-        ),
+      title: LocaleKeys.Common_Notifications.tr(),
+      children: [
+        _NotificationSummary(unreadCount: items.where((e) => e.unread).length),
+        const SizedBox(height: 16),
+        _SegmentHeader(labels: [
+          LocaleKeys.Patient_Notifications_All.tr(),
+          LocaleKeys.Patient_Notifications_Unread.tr(),
+        ]),
+        const SizedBox(height: 16),
+        for (final item in items) ...[
+          _NotificationBlock(item: item),
+          const SizedBox(height: 12),
+        ],
       ],
     );
   }
 }
 
 @RoutePage()
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  final _picker = ImagePicker();
+  final _cloudinary = CloudinaryUploadService();
+  String? _avatarUrl;
+  bool _uploading = false;
+
+  Future<void> _pickAndUploadAvatar() async {
+    final image = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 1200,
+      imageQuality: 86,
+    );
+    if (image == null || !mounted) return;
+
+    setState(() => _uploading = true);
+    try {
+      final url = await _cloudinary.uploadAvatar(image);
+      if (!mounted) return;
+      setState(() => _avatarUrl = url);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(LocaleKeys.Patient_Profile_UploadSuccess.tr())),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(LocaleKeys.Patient_Profile_UploadFailed.tr()),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _uploading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final account = context.watch<AuthBloc>().state.account;
+    final displayName =
+        account?.displayName ?? LocaleKeys.Patient_Profile_FallbackName.tr();
 
     return _PatientTabScaffold(
-      title: 'Cá nhân',
+      title: LocaleKeys.Patient_Tabs_Profile.tr(),
       children: [
-        _InfoTile(
-          assetPath: 'assets/images/ic_account.png',
-          title: account?.displayName ?? 'Người tập',
-          subtitle: 'Tài khoản patient',
+        _ProfileHeader(
+          displayName: displayName,
+          email: account?.email ?? LocaleKeys.Patient_Profile_NoEmail.tr(),
+          avatarUrl: _avatarUrl,
+          uploading: _uploading,
+          onUpload: _pickAndUploadAvatar,
         ),
-        const SizedBox(height: 8),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_indentity.png',
-          label: 'Hồ sơ cá nhân',
+        const SizedBox(height: 16),
+        _ProfileInfoGrid(
+          items: [
+            _ProfileInfoItem(
+              label: LocaleKeys.Patient_Profile_Role.tr(),
+              value: LocaleKeys.Patient_Profile_PatientAccount.tr(),
+              icon: Icons.badge_outlined,
+              accent: _AccentTone.primary,
+            ),
+            _ProfileInfoItem(
+              label: LocaleKeys.Patient_Profile_Status.tr(),
+              value: LocaleKeys.Patient_Profile_Active.tr(),
+              icon: Icons.verified_user_outlined,
+              accent: _AccentTone.secondary,
+            ),
+          ],
         ),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_phone.png',
-          label: 'Mạng lưới chăm sóc',
+        const SizedBox(height: 16),
+        _ProfileSection(
+          title: LocaleKeys.Patient_Profile_AccountSection.tr(),
+          children: [
+            _MenuTile(
+              assetPath: 'assets/images/ic_indentity.png',
+              label: LocaleKeys.Patient_Profile_PersonalProfile.tr(),
+              subtitle: LocaleKeys.Patient_Profile_PersonalProfileSubtitle.tr(),
+            ),
+            _MenuTile(
+              assetPath: 'assets/images/ic_phone.png',
+              label: LocaleKeys.Patient_Profile_CareNetwork.tr(),
+              subtitle: LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
+            ),
+          ],
         ),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_fill_bell.png',
-          label: 'Thông báo',
-        ),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_heart_circle.png',
-          label: 'Trợ năng',
-        ),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_fill_indentity.png',
-          label: 'Quyền riêng tư',
-        ),
-        const _MenuTile(
-          assetPath: 'assets/images/ic_fill_help.png',
-          label: 'Trợ giúp',
+        const SizedBox(height: 16),
+        _ProfileSection(
+          title: LocaleKeys.Patient_Profile_SettingsSection.tr(),
+          children: [
+            _MenuTile(
+              assetPath: 'assets/images/ic_fill_bell.png',
+              label: LocaleKeys.Patient_Profile_Notifications.tr(),
+              subtitle: LocaleKeys.Patient_Profile_NotificationsSubtitle.tr(),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const PatientNotificationsPage(),
+                ),
+              ),
+            ),
+            const _LanguageTile(),
+            _MenuTile(
+              assetPath: 'assets/images/ic_heart_circle.png',
+              label: LocaleKeys.Patient_Profile_Accessibility.tr(),
+              subtitle: LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr(),
+            ),
+            _MenuTile(
+              assetPath: 'assets/images/ic_fill_indentity.png',
+              label: LocaleKeys.Patient_Profile_Privacy.tr(),
+              subtitle: LocaleKeys.Patient_Profile_PrivacySubtitle.tr(),
+            ),
+            _MenuTile(
+              assetPath: 'assets/images/ic_fill_help.png',
+              label: LocaleKeys.Patient_Profile_Help.tr(),
+              subtitle: LocaleKeys.Patient_Profile_HelpSubtitle.tr(),
+            ),
+          ],
         ),
         const SizedBox(height: 16),
         const _LogoutButton(),
@@ -232,25 +427,19 @@ class ProfilePage extends StatelessWidget {
 class _PatientTabScaffold extends StatelessWidget {
   final String title;
   final List<Widget> children;
-  final List<Widget>? actions;
-
   const _PatientTabScaffold({
     required this.title,
     required this.children,
-    this.actions,
   });
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
-      backgroundColor: colorScheme.surface,
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: Text(title),
-        actions: actions,
-        backgroundColor: colorScheme.surface,
-        surfaceTintColor: colorScheme.primary,
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
       ),
       body: SafeArea(
         child: ListView(
@@ -289,7 +478,7 @@ class _TrainingHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '3 bài đang chờ',
+                  LocaleKeys.Patient_Training_PendingTitle.tr(),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800,
@@ -297,7 +486,7 @@ class _TrainingHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Ưu tiên bài hôm nay và kiểm tra thiết bị trước khi tập.',
+                  LocaleKeys.Patient_Training_PendingSubtitle.tr(),
                   style: TextStyle(color: colorScheme.onPrimaryContainer),
                 ),
               ],
@@ -336,7 +525,7 @@ class _ProgressHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Tuần này ổn định hơn',
+                  LocaleKeys.Patient_Progress_HeroTitle.tr(),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onTertiaryContainer,
                         fontWeight: FontWeight.w800,
@@ -344,7 +533,7 @@ class _ProgressHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Hoàn thành tăng 12% so với tuần trước.',
+                  LocaleKeys.Patient_Progress_HeroSubtitle.tr(),
                   style: TextStyle(color: colorScheme.onTertiaryContainer),
                 ),
               ],
@@ -384,7 +573,7 @@ class _DeviceHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Exoskeleton đang kết nối',
+                  LocaleKeys.Patient_Device_HeroTitle.tr(),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800,
@@ -392,7 +581,7 @@ class _DeviceHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  'Pin 78% - cảm biến sẵn sàng',
+                  LocaleKeys.Patient_Device_HeroSubtitle.tr(),
                   style: TextStyle(color: colorScheme.onPrimaryContainer),
                 ),
               ],
@@ -557,7 +746,7 @@ class _ExerciseCard extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Xem bài tập',
+                  tooltip: LocaleKeys.Patient_Training_ViewExerciseTooltip.tr(),
                   onPressed: () {},
                   icon: Icon(Icons.chevron_right, color: colors.foreground),
                 ),
@@ -882,11 +1071,224 @@ class _InfoTile extends StatelessWidget {
   }
 }
 
+class _ProfileHeader extends StatelessWidget {
+  final String displayName;
+  final String email;
+  final String? avatarUrl;
+  final bool uploading;
+  final VoidCallback onUpload;
+
+  const _ProfileHeader({
+    required this.displayName,
+    required this.email,
+    required this.avatarUrl,
+    required this.uploading,
+    required this.onUpload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              CircleAvatar(
+                radius: 38,
+                backgroundColor: colorScheme.primary,
+                foregroundImage:
+                    avatarUrl == null ? null : NetworkImage(avatarUrl!),
+                child: avatarUrl == null
+                    ? Text(
+                        displayName.characters.first.toUpperCase(),
+                        style: textTheme.headlineMedium?.copyWith(
+                          color: colorScheme.onPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      )
+                    : null,
+              ),
+              Positioned(
+                right: -4,
+                bottom: -4,
+                child: Tooltip(
+                  message: LocaleKeys.Patient_Profile_UploadPhoto.tr(),
+                  child: IconButton.filled(
+                    onPressed: uploading ? null : onUpload,
+                    icon: uploading
+                        ? SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.4,
+                              color: colorScheme.onPrimary,
+                            ),
+                          )
+                        : const Icon(Icons.photo_camera_outlined),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  displayName,
+                  style: textTheme.titleLarge?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  email,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onPrimaryContainer,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                FilledButton.tonalIcon(
+                  onPressed: uploading ? null : onUpload,
+                  icon: const Icon(Icons.cloud_upload_outlined),
+                  label: Text(LocaleKeys.Patient_Profile_UploadPhoto.tr()),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileInfoGrid extends StatelessWidget {
+  final List<_ProfileInfoItem> items;
+
+  const _ProfileInfoGrid({required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        for (final entry in items.indexed) ...[
+          if (entry.$1 > 0) const SizedBox(width: 12),
+          Expanded(child: _ProfileInfoCard(item: entry.$2)),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProfileInfoCard extends StatelessWidget {
+  final _ProfileInfoItem item;
+
+  const _ProfileInfoCard({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final colors = _accentColors(colorScheme, item.accent);
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: colorScheme.outlineVariant.withValues(alpha: 0.7),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(item.icon, color: colors.foreground),
+          const SizedBox(height: 10),
+          Text(
+            item.value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: colors.foreground,
+                  fontWeight: FontWeight.w800,
+                ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            item.label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ProfileInfoItem {
+  final String label;
+  final String value;
+  final IconData icon;
+  final _AccentTone accent;
+
+  const _ProfileInfoItem({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.accent,
+  });
+}
+
+class _ProfileSection extends StatelessWidget {
+  final String title;
+  final List<Widget> children;
+
+  const _ProfileSection({
+    required this.title,
+    required this.children,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+        ),
+        ...children,
+      ],
+    );
+  }
+}
+
 class _MenuTile extends StatelessWidget {
   final String assetPath;
   final String label;
+  final String? subtitle;
+  final VoidCallback? onTap;
 
-  const _MenuTile({required this.assetPath, required this.label});
+  const _MenuTile({
+    required this.assetPath,
+    required this.label,
+    this.subtitle,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -910,8 +1312,319 @@ class _MenuTile extends StatelessWidget {
           label,
           style: Theme.of(context).textTheme.titleMedium,
         ),
+        subtitle: subtitle == null ? null : Text(subtitle!),
         trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
+        onTap: onTap,
+      ),
+    );
+  }
+}
+
+class _NotificationSummary extends StatelessWidget {
+  final int unreadCount;
+
+  const _NotificationSummary({required this.unreadCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Row(
+        children: [
+          _TintIcon(
+            icon: Icons.notifications_active_outlined,
+            background: colorScheme.secondary,
+            foreground: colorScheme.onSecondary,
+            size: 58,
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  LocaleKeys.Patient_Notifications_SummaryTitle.tr(
+                    args: ['$unreadCount'],
+                  ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: colorScheme.onSecondaryContainer,
+                        fontWeight: FontWeight.w800,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  LocaleKeys.Patient_Notifications_SummaryBody.tr(),
+                  style: TextStyle(color: colorScheme.onSecondaryContainer),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NotificationBlock extends StatelessWidget {
+  final _NotificationItem item;
+
+  const _NotificationBlock({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final colors = _accentColors(colorScheme, item.tone);
+
+    return Card(
+      color: colorScheme.surface,
+      surfaceTintColor: colors.foreground,
+      elevation: item.unread ? 2 : 0,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _TintIcon(
+              icon: item.icon,
+              background: colors.background,
+              foreground: colors.foreground,
+              size: 48,
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style:
+                              Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                        ),
+                      ),
+                      if (item.unread)
+                        Container(
+                          width: 8,
+                          height: 8,
+                          decoration: BoxDecoration(
+                            color: colorScheme.primary,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    item.body,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      _MetaPill(
+                        icon: Icons.schedule,
+                        label: item.time,
+                        background: colorScheme.surfaceContainerLow,
+                        foreground: colorScheme.onSurfaceVariant,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _NotificationItem {
+  final IconData icon;
+  final String title;
+  final String body;
+  final String time;
+  final _AccentTone tone;
+  final bool unread;
+
+  const _NotificationItem({
+    required this.icon,
+    required this.title,
+    required this.body,
+    required this.time,
+    required this.tone,
+    required this.unread,
+  });
+}
+
+class _LanguageTile extends StatelessWidget {
+  const _LanguageTile();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final currentLanguage = context.locale.languageCode == 'vi'
+        ? LocaleKeys.Common_Vietnamese.tr()
+        : LocaleKeys.Common_English.tr();
+
+    return Card(
+      color: Colors.white,
+      elevation: 1,
+      shadowColor: colorScheme.primary.withValues(alpha: 0.08),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => _showLanguagePicker(context),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+          child: Row(
+            children: [
+              _TintIcon(
+                icon: Icons.translate,
+                background: colorScheme.tertiaryContainer,
+                foreground: colorScheme.tertiary,
+                size: 54,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      LocaleKeys.Common_Language.tr(),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      currentLanguage,
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showLanguagePicker(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  LocaleKeys.Patient_Profile_ChooseLanguage.tr(),
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+              ),
+              const SizedBox(height: 12),
+              _LanguageOption(
+                title: LocaleKeys.Common_English.tr(),
+                subtitle: LocaleKeys.Patient_Profile_EnglishSubtitle.tr(),
+                selected: context.locale.languageCode == 'en',
+                color: colorScheme.primary,
+                onTap: () async => _setLocale(sheetContext, const Locale('en')),
+              ),
+              const SizedBox(height: 10),
+              _LanguageOption(
+                title: LocaleKeys.Common_Vietnamese.tr(),
+                subtitle: LocaleKeys.Patient_Profile_VietnameseSubtitle.tr(),
+                selected: context.locale.languageCode == 'vi',
+                color: colorScheme.tertiary,
+                onTap: () async => _setLocale(sheetContext, const Locale('vi')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _setLocale(BuildContext context, Locale locale) async {
+    await context.setLocale(locale);
+    if (context.mounted) Navigator.of(context).pop();
+  }
+}
+
+class _LanguageOption extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _LanguageOption({
+    required this.title,
+    required this.subtitle,
+    required this.selected,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(18),
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: selected ? color.withValues(alpha: 0.12) : colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: selected ? color : colorScheme.outlineVariant,
+            width: selected ? 1.4 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            CircleAvatar(
+              radius: 20,
+              backgroundColor: color.withValues(alpha: 0.14),
+              child: Icon(Icons.language, color: color),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              selected ? Icons.check_circle : Icons.radio_button_unchecked,
+              color: selected ? color : colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1023,56 +1736,12 @@ class _LogoutButtonState extends State<_LogoutButton> {
       child: OutlinedButton.icon(
         onPressed: _submitting ? null : _logout,
         icon: const Icon(Icons.logout),
-        label: Text(_submitting ? 'Đang đăng xuất' : 'Đăng xuất'),
+        label: Text(
+          _submitting
+              ? LocaleKeys.Common_LoggingOut.tr()
+              : LocaleKeys.Common_Logout.tr(),
+        ),
       ),
     );
-  }
-}
-
-class _TrendPainter extends CustomPainter {
-  final Color color;
-
-  const _TrendPainter(this.color);
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final gridPaint = Paint()
-      ..color = const Color(0xFFC3C7CF)
-      ..strokeWidth = 1;
-    final linePaint = Paint()
-      ..color = color
-      ..strokeWidth = 3
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final markerPaint = Paint()..color = color;
-
-    for (var i = 1; i <= 3; i++) {
-      final y = size.height * i / 4;
-      canvas.drawLine(Offset(0, y), Offset(size.width, y), gridPaint);
-    }
-
-    final points = [
-      Offset(size.width * 0.08, size.height * 0.72),
-      Offset(size.width * 0.24, size.height * 0.48),
-      Offset(size.width * 0.40, size.height * 0.56),
-      Offset(size.width * 0.58, size.height * 0.34),
-      Offset(size.width * 0.76, size.height * 0.42),
-      Offset(size.width * 0.92, size.height * 0.24),
-    ];
-
-    final path = Path()..moveTo(points.first.dx, points.first.dy);
-    for (final point in points.skip(1)) {
-      path.lineTo(point.dx, point.dy);
-    }
-    canvas.drawPath(path, linePaint);
-
-    for (final point in points) {
-      canvas.drawCircle(point, 4, markerPaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _TrendPainter oldDelegate) {
-    return oldDelegate.color != color;
   }
 }

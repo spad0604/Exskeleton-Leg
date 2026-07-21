@@ -1,4 +1,6 @@
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 
 class AuthHeader extends StatelessWidget {
   final IconData icon;
@@ -166,7 +168,7 @@ class SocialAuthButtons extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14),
               child: Text(
-                'Hoặc tiếp tục với',
+                LocaleKeys.Auth_SocialDivider.tr(),
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),

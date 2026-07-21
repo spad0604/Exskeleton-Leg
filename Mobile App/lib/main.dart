@@ -6,11 +6,13 @@ import 'package:flutter_starter/data/states/bloc_observer.dart';
 import 'package:flutter_starter/di.dart';
 import 'package:flutter_starter/presenter/app.dart';
 import 'package:flutter_starter/presenter/languages/languages.dart';
+import 'package:flutter_starter/services/firebase/fcm_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await EasyLocalization.ensureInitialized();
+  await FcmService.initialize();
 
   await configureDependencies();
 
@@ -24,4 +26,3 @@ Future<void> main() async {
     ),
   );
 }
-

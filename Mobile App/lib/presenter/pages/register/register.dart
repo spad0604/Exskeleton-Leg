@@ -6,6 +6,7 @@ import 'package:flutter_starter/data/repositories/auth_repository/auth_repositor
 import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/di.dart';
+import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/navigation/navigation.dart';
 import 'package:flutter_starter/presenter/pages/auth_widgets.dart';
 import 'package:flutter_starter/presenter/pages/register/register_cubit.dart';
@@ -44,8 +45,8 @@ class _RegisterPageState extends State<RegisterPage> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     if (!_acceptedTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Bạn cần xác nhận đã đọc điều khoản sử dụng.'),
+        SnackBar(
+          content: Text(LocaleKeys.Auth_Register_TermsRequired.tr()),
         ),
       );
       return;
@@ -61,7 +62,9 @@ class _RegisterPageState extends State<RegisterPage> {
   void _onSocialPressed(String providerName) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('$providerName sẽ được hỗ trợ trong bản tiếp theo.'),
+        content: Text(
+          LocaleKeys.Common_ProviderComingSoon.tr(args: [providerName]),
+        ),
       ),
     );
   }
@@ -89,7 +92,8 @@ class _RegisterPageState extends State<RegisterPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Tạo tài khoản')),
+        backgroundColor: Colors.white,
+        appBar: AppBar(title: Text(LocaleKeys.Auth_Register_AppBarTitle.tr())),
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -98,14 +102,14 @@ class _RegisterPageState extends State<RegisterPage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
+                    color: Colors.white,
                     borderRadius: BorderRadius.circular(28),
                     boxShadow: [
                       BoxShadow(
                         color: Theme.of(context)
                             .colorScheme
                             .shadow
-                            .withValues(alpha: 0.08),
+                            .withValues(alpha: 0.05),
                         offset: const Offset(0, 18),
                         blurRadius: 44,
                       ),
@@ -118,28 +122,28 @@ class _RegisterPageState extends State<RegisterPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          const AuthHeader(
+                          AuthHeader(
                             icon: Icons.health_and_safety_outlined,
-                            title: 'Bắt đầu tập luyện an toàn',
-                            subtitle:
-                                'Tài khoản mới được tạo với vai trò người tập.',
+                            title: LocaleKeys.Auth_Register_Title.tr(),
+                            subtitle: LocaleKeys.Auth_Register_Subtitle.tr(),
                           ),
                           const SizedBox(height: 30),
                           AuthTextFormField(
-                            label: 'Họ và tên',
-                            hintText: 'Nguyễn An',
+                            label: LocaleKeys.Auth_Register_FullName.tr(),
+                            hintText:
+                                LocaleKeys.Auth_Register_FullNameHint.tr(),
                             prefixIcon: Icons.person_outline,
                             controller: _displayNameController,
                             textInputAction: TextInputAction.next,
                             autofillHints: const [AutofillHints.name],
-                            validator: (value) =>
-                                (value?.trim().length ?? 0) < 2
-                                    ? 'Vui lòng nhập họ và tên.'
-                                    : null,
+                            validator: (value) => (value?.trim().length ?? 0) <
+                                    2
+                                ? LocaleKeys.Auth_Register_FullNameRequired.tr()
+                                : null,
                           ),
                           const SizedBox(height: 18),
                           AuthTextFormField(
-                            label: 'Email',
+                            label: LocaleKeys.Common_Email.tr(),
                             hintText: 'user@example.com',
                             prefixIcon: Icons.email_outlined,
                             controller: _emailController,
@@ -151,23 +155,25 @@ class _RegisterPageState extends State<RegisterPage> {
                               return email.contains('@') &&
                                       email.split('@').last.contains('.')
                                   ? null
-                                  : 'Vui lòng nhập email hợp lệ.';
+                                  : LocaleKeys.Auth_Login_InvalidEmail.tr();
                             },
                           ),
                           const SizedBox(height: 18),
                           AuthTextFormField(
-                            label: 'Mật khẩu',
-                            hintText: 'Tạo mật khẩu',
+                            label: LocaleKeys.Common_Password.tr(),
+                            hintText:
+                                LocaleKeys.Auth_Register_PasswordHint.tr(),
                             prefixIcon: Icons.lock_outline,
                             controller: _passwordController,
                             obscureText: _obscurePassword,
                             textInputAction: TextInputAction.done,
                             autofillHints: const [AutofillHints.newPassword],
-                            helperText: 'Từ 8 đến 128 ký tự.',
+                            helperText:
+                                LocaleKeys.Auth_Register_PasswordHelper.tr(),
                             suffixIcon: IconButton(
                               tooltip: _obscurePassword
-                                  ? 'Hiện mật khẩu'
-                                  : 'Ẩn mật khẩu',
+                                  ? LocaleKeys.Auth_Login_ShowPassword.tr()
+                                  : LocaleKeys.Auth_Login_HidePassword.tr(),
                               onPressed: () => setState(() {
                                 _obscurePassword = !_obscurePassword;
                               }),
@@ -180,7 +186,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             validator: (value) {
                               final length = value?.characters.length ?? 0;
                               return length < 8 || length > 128
-                                  ? 'Mật khẩu cần từ 8 đến 128 ký tự.'
+                                  ? LocaleKeys.Auth_Register_PasswordLength.tr()
                                   : null;
                             },
                             onFieldSubmitted: (_) => _submit(),
@@ -193,9 +199,7 @@ class _RegisterPageState extends State<RegisterPage> {
                             onChanged: (value) => setState(() {
                               _acceptedTerms = value ?? false;
                             }),
-                            title: const Text(
-                              'Tôi đã đọc và đồng ý với điều khoản sử dụng phiên bản 2026-01.',
-                            ),
+                            title: Text(LocaleKeys.Auth_Register_Terms.tr()),
                           ),
                           const SizedBox(height: 16),
                           BlocBuilder<RegisterCubit, RegisterState>(
@@ -211,7 +215,8 @@ class _RegisterPageState extends State<RegisterPage> {
                                           strokeWidth: 2,
                                         ),
                                       )
-                                    : const Text('Đăng ký'),
+                                    : Text(
+                                        LocaleKeys.Auth_Register_Submit.tr()),
                               );
                             },
                           ),
@@ -224,7 +229,8 @@ class _RegisterPageState extends State<RegisterPage> {
                           const SizedBox(height: 14),
                           TextButton(
                             onPressed: () => context.router.maybePop(),
-                            child: const Text('Đã có tài khoản? Đăng nhập'),
+                            child:
+                                Text(LocaleKeys.Auth_Register_LoginLink.tr()),
                           ),
                         ],
                       ),

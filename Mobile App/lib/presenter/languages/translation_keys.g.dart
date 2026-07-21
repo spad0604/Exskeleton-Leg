@@ -2,14 +2,209 @@
 
 // ignore_for_file: constant_identifier_names
 
-abstract class  LocaleKeys {
+abstract class LocaleKeys {
   static const Errors_AnUnknownErrorOccurred = 'Errors.AnUnknownErrorOccurred';
   static const Errors_NetworkError = 'Errors.NetworkError';
-  static const Errors_InvalidUsernameOrPassword = 'Errors.InvalidUsernameOrPassword';
+  static const Errors_InvalidUsernameOrPassword =
+      'Errors.InvalidUsernameOrPassword';
+  static const Errors_EmailAlreadyExists = 'Errors.EmailAlreadyExists';
+  static const Errors_TermsNotAccepted = 'Errors.TermsNotAccepted';
   static const Errors = 'Errors';
+  static const App_Name = 'App.Name';
+  static const App = 'App';
+  static const Common_Email = 'Common.Email';
+  static const Common_Password = 'Common.Password';
+  static const Common_Retry = 'Common.Retry';
+  static const Common_View = 'Common.View';
+  static const Common_ViewExercises = 'Common.ViewExercises';
+  static const Common_Notifications = 'Common.Notifications';
+  static const Common_Logout = 'Common.Logout';
+  static const Common_LoggingOut = 'Common.LoggingOut';
+  static const Common_Language = 'Common.Language';
+  static const Common_English = 'Common.English';
+  static const Common_Vietnamese = 'Common.Vietnamese';
+  static const Common_NotEnoughData = 'Common.NotEnoughData';
+  static const Common_Minutes = 'Common.Minutes';
+  static const Common_ApproxMinutes = 'Common.ApproxMinutes';
+  static const Common_SetsReps = 'Common.SetsReps';
+  static const Common_ProviderComingSoon = 'Common.ProviderComingSoon';
+  static const Common = 'Common';
+  static const Auth_Login_Title = 'Auth.Login.Title';
+  static const Auth_Login_Subtitle = 'Auth.Login.Subtitle';
+  static const Auth_Login_PasswordHint = 'Auth.Login.PasswordHint';
+  static const Auth_Login_ShowPassword = 'Auth.Login.ShowPassword';
+  static const Auth_Login_HidePassword = 'Auth.Login.HidePassword';
+  static const Auth_Login_PasswordRequired = 'Auth.Login.PasswordRequired';
+  static const Auth_Login_InvalidEmail = 'Auth.Login.InvalidEmail';
+  static const Auth_Login_CreateAccountLink = 'Auth.Login.CreateAccountLink';
+  static const Auth_Login = 'Auth.Login';
+  static const Auth_Register_AppBarTitle = 'Auth.Register.AppBarTitle';
+  static const Auth_Register_Title = 'Auth.Register.Title';
+  static const Auth_Register_Subtitle = 'Auth.Register.Subtitle';
+  static const Auth_Register_FullName = 'Auth.Register.FullName';
+  static const Auth_Register_FullNameHint = 'Auth.Register.FullNameHint';
+  static const Auth_Register_FullNameRequired =
+      'Auth.Register.FullNameRequired';
+  static const Auth_Register_PasswordHint = 'Auth.Register.PasswordHint';
+  static const Auth_Register_PasswordHelper = 'Auth.Register.PasswordHelper';
+  static const Auth_Register_PasswordLength = 'Auth.Register.PasswordLength';
+  static const Auth_Register_Terms = 'Auth.Register.Terms';
+  static const Auth_Register_TermsRequired = 'Auth.Register.TermsRequired';
+  static const Auth_Register_Submit = 'Auth.Register.Submit';
+  static const Auth_Register_LoginLink = 'Auth.Register.LoginLink';
+  static const Auth_Register = 'Auth.Register';
+  static const Auth_SocialDivider = 'Auth.SocialDivider';
+  static const Auth = 'Auth';
+  static const Patient_Tabs_Today = 'Patient.Tabs.Today';
+  static const Patient_Tabs_Training = 'Patient.Tabs.Training';
+  static const Patient_Tabs_Progress = 'Patient.Tabs.Progress';
+  static const Patient_Tabs_Device = 'Patient.Tabs.Device';
+  static const Patient_Tabs_Profile = 'Patient.Tabs.Profile';
+  static const Patient_Tabs = 'Patient.Tabs';
+  static const Patient_Training_Today = 'Patient.Training.Today';
+  static const Patient_Training_All = 'Patient.Training.All';
+  static const Patient_Training_PendingTitle = 'Patient.Training.PendingTitle';
+  static const Patient_Training_PendingSubtitle =
+      'Patient.Training.PendingSubtitle';
+  static const Patient_Training_ViewExerciseTooltip =
+      'Patient.Training.ViewExerciseTooltip';
+  static const Patient_Training = 'Patient.Training';
+  static const Patient_Progress_Week = 'Patient.Progress.Week';
+  static const Patient_Progress_Month = 'Patient.Progress.Month';
+  static const Patient_Progress_Completed = 'Patient.Progress.Completed';
+  static const Patient_Progress_TrainingTime = 'Patient.Progress.TrainingTime';
+  static const Patient_Progress_CorrectMoves = 'Patient.Progress.CorrectMoves';
+  static const Patient_Progress_StreakDays = 'Patient.Progress.StreakDays';
+  static const Patient_Progress_RecentHistory =
+      'Patient.Progress.RecentHistory';
+  static const Patient_Progress_HeroTitle = 'Patient.Progress.HeroTitle';
+  static const Patient_Progress_HeroSubtitle = 'Patient.Progress.HeroSubtitle';
+  static const Patient_Progress_SessionSitStand =
+      'Patient.Progress.SessionSitStand';
+  static const Patient_Progress_SessionSitStandSubtitle =
+      'Patient.Progress.SessionSitStandSubtitle';
+  static const Patient_Progress_SessionHipExtension =
+      'Patient.Progress.SessionHipExtension';
+  static const Patient_Progress_SessionHipExtensionSubtitle =
+      'Patient.Progress.SessionHipExtensionSubtitle';
+  static const Patient_Progress = 'Patient.Progress';
+  static const Patient_Device_NoDevice = 'Patient.Device.NoDevice';
+  static const Patient_Device_Ready = 'Patient.Device.Ready';
+  static const Patient_Device_NeedsCheck = 'Patient.Device.NeedsCheck';
+  static const Patient_Device_Battery = 'Patient.Device.Battery';
+  static const Patient_Device_Firmware = 'Patient.Device.Firmware';
+  static const Patient_Device_SensorsStable = 'Patient.Device.SensorsStable';
+  static const Patient_Device_SensorsStableSubtitle =
+      'Patient.Device.SensorsStableSubtitle';
+  static const Patient_Device_CalibrationValid =
+      'Patient.Device.CalibrationValid';
+  static const Patient_Device_CalibrationExpiry =
+      'Patient.Device.CalibrationExpiry';
+  static const Patient_Device_Calibrate = 'Patient.Device.Calibrate';
+  static const Patient_Device_Diagnostics = 'Patient.Device.Diagnostics';
+  static const Patient_Device_HeroTitle = 'Patient.Device.HeroTitle';
+  static const Patient_Device_HeroSubtitle = 'Patient.Device.HeroSubtitle';
+  static const Patient_Device_ViewDeviceTooltip =
+      'Patient.Device.ViewDeviceTooltip';
+  static const Patient_Device_PairDeviceTitle =
+      'Patient.Device.PairDeviceTitle';
+  static const Patient_Device_PairDeviceMessage =
+      'Patient.Device.PairDeviceMessage';
+  static const Patient_Device_NotReady = 'Patient.Device.NotReady';
+  static const Patient_Device = 'Patient.Device';
+  static const Patient_Profile_FallbackName = 'Patient.Profile.FallbackName';
+  static const Patient_Profile_PatientAccount =
+      'Patient.Profile.PatientAccount';
+  static const Patient_Profile_NoEmail = 'Patient.Profile.NoEmail';
+  static const Patient_Profile_UploadPhoto = 'Patient.Profile.UploadPhoto';
+  static const Patient_Profile_UploadSuccess = 'Patient.Profile.UploadSuccess';
+  static const Patient_Profile_UploadFailed = 'Patient.Profile.UploadFailed';
+  static const Patient_Profile_Role = 'Patient.Profile.Role';
+  static const Patient_Profile_Status = 'Patient.Profile.Status';
+  static const Patient_Profile_Active = 'Patient.Profile.Active';
+  static const Patient_Profile_AccountSection =
+      'Patient.Profile.AccountSection';
+  static const Patient_Profile_SettingsSection =
+      'Patient.Profile.SettingsSection';
+  static const Patient_Profile_PersonalProfile =
+      'Patient.Profile.PersonalProfile';
+  static const Patient_Profile_PersonalProfileSubtitle =
+      'Patient.Profile.PersonalProfileSubtitle';
+  static const Patient_Profile_CareNetwork = 'Patient.Profile.CareNetwork';
+  static const Patient_Profile_CareNetworkSubtitle =
+      'Patient.Profile.CareNetworkSubtitle';
+  static const Patient_Profile_Notifications = 'Patient.Profile.Notifications';
+  static const Patient_Profile_NotificationsSubtitle =
+      'Patient.Profile.NotificationsSubtitle';
+  static const Patient_Profile_Accessibility = 'Patient.Profile.Accessibility';
+  static const Patient_Profile_AccessibilitySubtitle =
+      'Patient.Profile.AccessibilitySubtitle';
+  static const Patient_Profile_Privacy = 'Patient.Profile.Privacy';
+  static const Patient_Profile_PrivacySubtitle =
+      'Patient.Profile.PrivacySubtitle';
+  static const Patient_Profile_Help = 'Patient.Profile.Help';
+  static const Patient_Profile_HelpSubtitle = 'Patient.Profile.HelpSubtitle';
+  static const Patient_Profile_ChooseLanguage =
+      'Patient.Profile.ChooseLanguage';
+  static const Patient_Profile_EnglishSubtitle =
+      'Patient.Profile.EnglishSubtitle';
+  static const Patient_Profile_VietnameseSubtitle =
+      'Patient.Profile.VietnameseSubtitle';
+  static const Patient_Profile = 'Patient.Profile';
+  static const Patient_Notifications_SummaryTitle =
+      'Patient.Notifications.SummaryTitle';
+  static const Patient_Notifications_SummaryBody =
+      'Patient.Notifications.SummaryBody';
+  static const Patient_Notifications_All = 'Patient.Notifications.All';
+  static const Patient_Notifications_Unread = 'Patient.Notifications.Unread';
+  static const Patient_Notifications_SafetyTitle =
+      'Patient.Notifications.SafetyTitle';
+  static const Patient_Notifications_SafetyBody =
+      'Patient.Notifications.SafetyBody';
+  static const Patient_Notifications_SafetyTime =
+      'Patient.Notifications.SafetyTime';
+  static const Patient_Notifications_TrainingTitle =
+      'Patient.Notifications.TrainingTitle';
+  static const Patient_Notifications_TrainingBody =
+      'Patient.Notifications.TrainingBody';
+  static const Patient_Notifications_TrainingTime =
+      'Patient.Notifications.TrainingTime';
+  static const Patient_Notifications_DeviceTitle =
+      'Patient.Notifications.DeviceTitle';
+  static const Patient_Notifications_DeviceBody =
+      'Patient.Notifications.DeviceBody';
+  static const Patient_Notifications_DeviceTime =
+      'Patient.Notifications.DeviceTime';
+  static const Patient_Notifications_CareTitle =
+      'Patient.Notifications.CareTitle';
+  static const Patient_Notifications_CareBody =
+      'Patient.Notifications.CareBody';
+  static const Patient_Notifications_CareTime =
+      'Patient.Notifications.CareTime';
+  static const Patient_Notifications = 'Patient.Notifications';
+  static const Patient_Home_CompletedExercises =
+      'Patient.Home.CompletedExercises';
+  static const Patient_Home_TrainingTime = 'Patient.Home.TrainingTime';
+  static const Patient_Home_CorrectMoves = 'Patient.Home.CorrectMoves';
+  static const Patient_Home_NeedsAttention = 'Patient.Home.NeedsAttention';
+  static const Patient_Home_Greeting = 'Patient.Home.Greeting';
+  static const Patient_Home_HeroSubtitle = 'Patient.Home.HeroSubtitle';
+  static const Patient_Home_LoadFailedTitle = 'Patient.Home.LoadFailedTitle';
+  static const Patient_Home_LoadFailedSubtitle =
+      'Patient.Home.LoadFailedSubtitle';
+  static const Patient_Home_NoExerciseTitle = 'Patient.Home.NoExerciseTitle';
+  static const Patient_Home_NoExerciseSubtitle =
+      'Patient.Home.NoExerciseSubtitle';
+  static const Patient_Home_StartExercise = 'Patient.Home.StartExercise';
+  static const Patient_Home_Assistance = 'Patient.Home.Assistance';
+  static const Patient_Home_AssistanceLow = 'Patient.Home.AssistanceLow';
+  static const Patient_Home_AssistanceMedium = 'Patient.Home.AssistanceMedium';
+  static const Patient_Home_AssistanceHigh = 'Patient.Home.AssistanceHigh';
+  static const Patient_Home_NoAlerts = 'Patient.Home.NoAlerts';
+  static const Patient_Home = 'Patient.Home';
+  static const Patient = 'Patient';
   static const Hello = 'Hello';
   static const Username = 'Username';
   static const Password = 'Password';
   static const Login = 'Login';
-
 }
