@@ -42,10 +42,10 @@ extension GetItInjectableX on _i174.GetIt {
       environmentFilter,
     );
     final registerModule = _$RegisterModule();
-    gh.singleton<_i963.AuthBloc>(() => _i963.AuthBloc());
-    gh.singleton<_i932.SettingsBloc>(() => _i932.SettingsBloc());
     gh.singleton<_i558.FlutterSecureStorage>(
         () => registerModule.flutterSecureStorage);
+    gh.singleton<_i963.AuthBloc>(() => _i963.AuthBloc());
+    gh.singleton<_i932.SettingsBloc>(() => _i932.SettingsBloc());
     gh.singleton<_i132.OauthTokenManager>(() => _i290.DefaultOauthTokenManager(
         flutterSecureStorage: gh<_i558.FlutterSecureStorage>()));
     gh.singleton<_i551.AppRouter>(
@@ -64,11 +64,11 @@ extension GetItInjectableX on _i174.GetIt {
         () => _i536.NetworkDataSource(gh<_i288.NetworkDio>()));
     gh.singleton<_i344.AuthRepository>(() => _i522.DefaultAuthRepository(
         networkDataSource: gh<_i536.NetworkDataSource>()));
-    gh.singleton<_i470.LoginUseCase>(
-        () => _i470.LoginUseCase(authRepository: gh<_i344.AuthRepository>()));
     gh.singleton<_i412.VerifyLoginStatusUseCase>(() =>
         _i412.VerifyLoginStatusUseCase(
             authRepository: gh<_i344.AuthRepository>()));
+    gh.singleton<_i470.LoginUseCase>(
+        () => _i470.LoginUseCase(authRepository: gh<_i344.AuthRepository>()));
     gh.factory<_i517.SplashBloc>(() => _i517.SplashBloc(
         verifyLoginStatus: gh<_i412.VerifyLoginStatusUseCase>()));
     gh.factory<_i902.LoginBloc>(
