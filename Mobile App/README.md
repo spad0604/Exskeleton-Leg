@@ -35,6 +35,33 @@ client refreshes an expired access token once, retries the original request,
 and clears the local session if refresh rotation fails or token reuse is
 reported by the backend.
 
+### Patient shell data contract
+
+The patient-facing screens use backend read models; they do not fabricate
+home, training, progress, device, or notification data:
+
+| Screen | API request |
+|---|---|
+| Today | `GET /patients/{patient_id}/home` |
+| Training / Today | `GET /patients/{patient_id}/plan-items?scope=today` |
+| Training / All | `GET /patients/{patient_id}/plan-items?scope=all` |
+| Progress / Week | `GET /patients/{patient_id}/progress/overview?period=week` |
+| Progress / Month | `GET /patients/{patient_id}/progress/overview?period=month` |
+| Device | `GET /devices?patient_id={patient_id}` |
+| Notifications | `GET /me/notifications` |
+| Account | `GET /me` |
+
+Every API screen has loading, retry/error, and empty-data states. Values such
+as pending exercise count, progress totals, device model, readiness, and
+battery are rendered from the response. Actions whose backend/hardware
+command contract is not available yet (calibration and diagnostics) are
+shown as explicit informational actions rather than pretending they ran.
+
+Exercise content is localized through the `Exercises.*` keys in the EN/VI
+translation files. The backend catalog supplies those keys together with the
+exercise safety metadata, while clinician-facing plan decisions remain
+server-side and must be approved before use.
+
 ### When adding a new translated text
 
 - Add the translated text to `lib/presenter/languages/translations/<langualge>.json`

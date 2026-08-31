@@ -44,6 +44,57 @@ class NetworkDataSource {
     return PatientHome.fromJson(_data(response.data));
   }
 
+  Future<List<Map<String, dynamic>>> getTodayPlanItems(String patientId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/plan-items/today',
+    );
+    return _dataList(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getPlanItems(String patientId,
+      {String scope = 'today'}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/plan-items',
+      queryParameters: {'scope': scope},
+    );
+    return _dataList(response.data);
+  }
+
+  Future<Map<String, dynamic>> getProgressOverview(String patientId,
+      {String period = 'week'}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/progress/overview',
+      queryParameters: {'period': period},
+    );
+    return _data(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getDevices(String patientId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'devices',
+      queryParameters: {'patient_id': patientId},
+    );
+    return _dataList(response.data);
+  }
+
+  Future<void> registerFcmToken(String token) async {
+    await _dio.post<Map<String, dynamic>>(
+      'me/fcm-token',
+      data: {'token': token, 'platform': 'android'},
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    final response = await _dio.get<Map<String, dynamic>>('me/notifications');
+    return _dataList(response.data);
+  }
+
+  Future<Map<String, dynamic>> getPatient(String patientId) async {
+    final response =
+        await _dio.get<Map<String, dynamic>>('patients/$patientId');
+    return _data(response.data);
+  }
+
   Future<void> logout() async {
     final refreshToken = await _dio.getRefreshToken();
     try {
@@ -62,5 +113,16 @@ class NetworkDataSource {
     final data = envelope?['data'];
     if (data is Map<String, dynamic>) return data;
     throw const FormatException('Invalid API envelope');
+  }
+
+  List<Map<String, dynamic>> _dataList(Map<String, dynamic>? envelope) {
+    final data = envelope?['data'];
+    if (data is List) {
+      return data
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+    }
+    throw const FormatException('Invalid API list envelope');
   }
 }

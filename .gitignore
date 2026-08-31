@@ -6,6 +6,8 @@ desktop.ini
 # Editor / IDE
 .idea/
 .vscode/
+!/.vscode/
+!/.vscode/launch.json
 .agents/
 .codex/
 *.swp

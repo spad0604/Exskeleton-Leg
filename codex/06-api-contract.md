@@ -218,6 +218,37 @@ Backend validate target theo `target_schema` và device compatibility; không ti
 | GET | `/sessions/{session_id}/assessments` | Related scoped | AI/rule results |
 | GET | `/sessions/{session_id}/alerts` | Related scoped | Warning/critical events |
 
+## 7. Mobile patient read models currently implemented
+
+The current Flutter patient shell consumes these authenticated read models:
+
+| Method | Endpoint | Response used by |
+|---|---|---|
+| GET | `/patients/{patient_id}/home` | Today home summary, next plan item, device readiness, alerts |
+| GET | `/patients/{patient_id}/plan-items?scope=today\|all` | Training tabs |
+| GET | `/patients/{patient_id}/progress/overview?period=week\|month` | Progress tabs and recent sessions |
+| GET | `/devices?patient_id={patient_id}` | Device screen |
+| GET | `/devices/{device_id}` | Device detail read model |
+| GET | `/me/notifications` | Notification screen |
+| POST | `/me/fcm-token` | Mobile push-token registration |
+
+Exercise catalog response có các field `code`, `category`, `name_key`,
+`description_key`, `instructions_key`, `safety_key`, `difficulty` và
+`requires_support`. Mobile resolve các key này qua EN/VI i18n, nên API không
+ghi cứng ngôn ngữ hiển thị.
+
+These endpoints are backed by PostgreSQL through `PatientDataService`, with
+Flyway migration `V202608310002__create_patient_data.sql`. Initial device,
+exercise, and plan rows are created only when a patient has no patient data;
+the API then returns the persisted rows. Training history remains empty until
+a real session writer is connected, so the mobile UI displays “not enough
+data” instead of hardcoded history.
+
+The current backend does not yet expose hardware command endpoints for
+calibration/diagnostics or session start/stop writes. The mobile app therefore
+does not claim those operations succeeded; implementing them requires the
+device protocol and session command contract described in sections 4 and 6.
+
 Create session:
 
 ```json
@@ -319,4 +350,3 @@ Namespace device tách khỏi user API để middleware/audience/rate limit riê
 - Không đổi nghĩa/type field trong v1; deprecate có thời hạn và telemetry usage.
 - Enum client phải có `unknown`; server không gửi enum mới nếu old-client safety flow không xử lý được.
 - OpenAPI được version control; CI kiểm tra breaking change.
-

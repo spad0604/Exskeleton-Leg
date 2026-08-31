@@ -27,9 +27,10 @@ public final class AuthModels {
     public record LogoutRequest(@NotBlank String refreshToken) {
     }
 
-    public record PublicUser(UUID id, String displayName, List<String> roles) {
+    public record PublicUser(UUID id, String displayName, List<String> roles, String email, String locale, String timezone) {
         static PublicUser from(UserEntity user) {
-            return new PublicUser(user.getId(), user.getDisplayName(), user.getRoles().stream().sorted().toList());
+            return new PublicUser(user.getId(), user.getDisplayName(), user.getRoles().stream().sorted().toList(),
+                    user.getEmailNormalized(), user.getLocale(), user.getTimezone());
         }
     }
 

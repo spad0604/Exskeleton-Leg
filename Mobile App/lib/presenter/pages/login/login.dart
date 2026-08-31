@@ -50,7 +50,10 @@ class _LoginPageState extends State<LoginPage> {
   void _onSocialPressed(String providerName) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-          content: Text('$providerName sẽ được hỗ trợ trong bản tiếp theo.')),
+        content: Text(
+          LocaleKeys.Common_ProviderComingSoon.tr(args: [providerName]),
+        ),
+      ),
     );
   }
 
@@ -79,6 +82,7 @@ class _LoginPageState extends State<LoginPage> {
         LoginFailureListener(listener: _onError),
       ],
       child: Scaffold(
+        backgroundColor: Colors.white,
         body: SafeArea(
           child: Center(
             child: SingleChildScrollView(
@@ -90,14 +94,14 @@ class _LoginPageState extends State<LoginPage> {
                     key: _formKey,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
+                        color: Colors.white,
                         borderRadius: BorderRadius.circular(28),
                         boxShadow: [
                           BoxShadow(
                             color: Theme.of(context)
                                 .colorScheme
                                 .shadow
-                                .withValues(alpha: 0.08),
+                                .withValues(alpha: 0.05),
                             offset: const Offset(0, 18),
                             blurRadius: 44,
                           ),
@@ -108,15 +112,24 @@ class _LoginPageState extends State<LoginPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const AuthHeader(
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.asset(
+                                'assets/images/exoskeleton_leg_logo.png',
+                                height: 132,
+                                fit: BoxFit.contain,
+                                semanticLabel: 'Exoskeleton Leg',
+                              ),
+                            ),
+                            const SizedBox(height: 16),
+                            AuthHeader(
                               icon: Icons.accessibility_new_rounded,
-                              title: 'Chào mừng trở lại',
-                              subtitle:
-                                  'Đăng nhập để tiếp tục chương trình tập của bạn.',
+                              title: LocaleKeys.Auth_Login_Title.tr(),
+                              subtitle: LocaleKeys.Auth_Login_Subtitle.tr(),
                             ),
                             const SizedBox(height: 30),
                             AuthTextFormField(
-                              label: 'Email',
+                              label: LocaleKeys.Common_Email.tr(),
                               hintText: 'user@example.com',
                               prefixIcon: Icons.email_outlined,
                               keyboardType: TextInputType.emailAddress,
@@ -127,15 +140,15 @@ class _LoginPageState extends State<LoginPage> {
                             ),
                             const SizedBox(height: 18),
                             AuthTextFormField(
-                              label: tr(LocaleKeys.Password),
-                              hintText: 'Nhập mật khẩu',
+                              label: LocaleKeys.Common_Password.tr(),
+                              hintText: LocaleKeys.Auth_Login_PasswordHint.tr(),
                               prefixIcon: Icons.lock_outline,
                               autofillHints: const [AutofillHints.password],
                               textInputAction: TextInputAction.done,
                               suffixIcon: IconButton(
                                 tooltip: _obscurePassword
-                                    ? 'Hiện mật khẩu'
-                                    : 'Ẩn mật khẩu',
+                                    ? LocaleKeys.Auth_Login_ShowPassword.tr()
+                                    : LocaleKeys.Auth_Login_HidePassword.tr(),
                                 onPressed: () => setState(() {
                                   _obscurePassword = !_obscurePassword;
                                 }),
@@ -147,7 +160,7 @@ class _LoginPageState extends State<LoginPage> {
                               ),
                               obscureText: _obscurePassword,
                               validator: (value) => (value?.isEmpty ?? true)
-                                  ? 'Vui lòng nhập mật khẩu.'
+                                  ? LocaleKeys.Auth_Login_PasswordRequired.tr()
                                   : null,
                               onFieldSubmitted: (_) => _onLoginPressed(),
                               onChanged: _onPasswordChanged,
@@ -176,7 +189,9 @@ class _LoginPageState extends State<LoginPage> {
                             TextButton(
                               onPressed: () =>
                                   context.router.pushNamed('/auth/register'),
-                              child: const Text('Chưa có tài khoản? Đăng ký'),
+                              child: Text(
+                                LocaleKeys.Auth_Login_CreateAccountLink.tr(),
+                              ),
                             ),
                           ],
                         ),
@@ -197,7 +212,7 @@ class _LoginPageState extends State<LoginPage> {
     if (email.isEmpty ||
         !email.contains('@') ||
         !email.split('@').last.contains('.')) {
-      return 'Vui lòng nhập email hợp lệ.';
+      return LocaleKeys.Auth_Login_InvalidEmail.tr();
     }
     return null;
   }

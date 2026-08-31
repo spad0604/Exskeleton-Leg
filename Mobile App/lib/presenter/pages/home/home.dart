@@ -1,4 +1,5 @@
 import 'package:auto_route/auto_route.dart';
+import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/data/entities/patient_home.dart';
@@ -8,7 +9,10 @@ import 'package:flutter_starter/data/sources/network/network.dart';
 import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/di.dart';
+import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/pages/home/home_cubit.dart';
+import 'package:flutter_starter/presenter/pages/patient/patient_placeholders.dart';
+import 'package:flutter_starter/presenter/navigation/navigation.dart';
 
 @RoutePage()
 class HomePage extends StatelessWidget implements AutoRouteWrapper {
@@ -37,12 +41,19 @@ class HomePage extends StatelessWidget implements AutoRouteWrapper {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text('Hôm nay'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        title: Text(LocaleKeys.Patient_Tabs_Today.tr()),
         actions: [
           IconButton(
-            tooltip: 'Thông báo',
-            onPressed: () {},
+            tooltip: LocaleKeys.Common_Notifications.tr(),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PatientNotificationsPage(),
+              ),
+            ),
             icon: const Icon(Icons.notifications_outlined),
           ),
           BlocConsumer<LogoutCubit, LogoutStatus>(
@@ -52,7 +63,7 @@ class HomePage extends StatelessWidget implements AutoRouteWrapper {
               }
             },
             builder: (context, status) => IconButton(
-              tooltip: 'Đăng xuất',
+              tooltip: LocaleKeys.Common_Logout.tr(),
               onPressed: status == LogoutStatus.submitting
                   ? null
                   : () => context.read<LogoutCubit>().logout(),
@@ -115,7 +126,7 @@ class _HomeContent extends StatelessWidget {
               child: _TodayMetric(
                 icon: Icons.task_alt,
                 value: '${metrics.completedCount} / ${metrics.plannedCount}',
-                label: 'Bài đã tập',
+                label: LocaleKeys.Patient_Home_CompletedExercises.tr(),
                 background: colorScheme.primaryContainer,
                 foreground: colorScheme.onPrimaryContainer,
               ),
@@ -125,7 +136,7 @@ class _HomeContent extends StatelessWidget {
               child: _TodayMetric(
                 icon: Icons.timer_outlined,
                 value: _minutesLabel(metrics.activeSeconds),
-                label: 'Thời gian',
+                label: LocaleKeys.Patient_Home_TrainingTime.tr(),
                 background: colorScheme.secondaryContainer,
                 foreground: colorScheme.onSecondaryContainer,
               ),
@@ -136,12 +147,13 @@ class _HomeContent extends StatelessWidget {
         _TodayMetric(
           icon: Icons.check_circle_outline,
           value: _ratioLabel(metrics.correctnessRatio),
-          label: 'Động tác đạt',
+          label: LocaleKeys.Patient_Home_CorrectMoves.tr(),
           background: colorScheme.tertiaryContainer,
           foreground: colorScheme.onTertiaryContainer,
         ),
         const SizedBox(height: 24),
-        Text('Cần chú ý', style: Theme.of(context).textTheme.titleLarge),
+        Text(LocaleKeys.Patient_Home_NeedsAttention.tr(),
+            style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 8),
         if (data.openAlerts.isEmpty)
           const _NoAlertPreview()
@@ -153,11 +165,11 @@ class _HomeContent extends StatelessWidget {
 
   String _minutesLabel(int activeSeconds) {
     final minutes = (activeSeconds / 60).round();
-    return '$minutes phút';
+    return LocaleKeys.Common_Minutes.tr(args: ['$minutes']);
   }
 
   String _ratioLabel(double? ratio) {
-    if (ratio == null) return 'Chưa đủ dữ liệu';
+    if (ratio == null) return LocaleKeys.Common_NotEnoughData.tr();
     return '${(ratio * 100).round()}%';
   }
 }
@@ -198,7 +210,7 @@ class _HomeHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Xin chào, $displayName',
+                  LocaleKeys.Patient_Home_Greeting.tr(args: [displayName]),
                   style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800,
@@ -206,7 +218,7 @@ class _HomeHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Hôm nay mình tập nhẹ và chắc nhé.',
+                  LocaleKeys.Patient_Home_HeroSubtitle.tr(),
                   style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                       ),
@@ -268,20 +280,20 @@ class _HomeError extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             Text(
-              'Chưa tải được dữ liệu hôm nay',
+              LocaleKeys.Patient_Home_LoadFailedTitle.tr(),
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Kiểm tra kết nối hoặc thử lại sau.',
+            Text(
+              LocaleKeys.Patient_Home_LoadFailedSubtitle.tr(),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
             FilledButton.icon(
               onPressed: onRetry,
               icon: const Icon(Icons.refresh),
-              label: const Text('Thử lại'),
+              label: Text(LocaleKeys.Common_Retry.tr()),
             ),
           ],
         ),
@@ -303,8 +315,8 @@ class _HomeStatusBanner extends StatelessWidget {
         icon: Icons.settings_remote_outlined,
         foreground: Theme.of(context).colorScheme.primary,
         background: Theme.of(context).colorScheme.primaryContainer,
-        title: 'Chưa ghép thiết bị',
-        message: 'Ghép thiết bị để bắt đầu bài tập có hỗ trợ.',
+        title: LocaleKeys.Patient_Device_PairDeviceTitle.tr(),
+        message: LocaleKeys.Patient_Device_PairDeviceMessage.tr(),
       );
     }
 
@@ -316,9 +328,15 @@ class _HomeStatusBanner extends StatelessWidget {
       foreground: ready ? colorScheme.secondary : const Color(0xFF5E5E65),
       background:
           ready ? colorScheme.secondaryContainer : const Color(0xFFE5E1E6),
-      title: ready ? 'Thiết bị đã sẵn sàng' : 'Thiết bị chưa sẵn sàng',
-      message:
-          '${currentDevice.serialNumber} - Pin ${currentDevice.batteryPercent}%',
+      title: ready
+          ? LocaleKeys.Patient_Device_Ready.tr()
+          : LocaleKeys.Patient_Device_NotReady.tr(),
+      message: LocaleKeys.Patient_Device_Battery.tr(
+        args: [
+          currentDevice.serialNumber,
+          '${currentDevice.batteryPercent}',
+        ],
+      ),
     );
   }
 }
@@ -370,8 +388,8 @@ class _StatusContainer extends StatelessWidget {
             ),
           ),
           IconButton(
-            tooltip: 'Xem thiết bị',
-            onPressed: () {},
+            tooltip: LocaleKeys.Patient_Device_ViewDeviceTooltip.tr(),
+            onPressed: () => context.router.push(const DeviceRoute()),
             icon: const Icon(Icons.chevron_right),
           ),
         ],
@@ -427,8 +445,12 @@ class _NextExerciseCard extends StatelessWidget {
               children: [
                 _PlanChip(
                   icon: Icons.repeat,
-                  label:
-                      '${planItem.target.sets} hiệp x ${planItem.target.repetitionsPerSet} lần',
+                  label: LocaleKeys.Common_SetsReps.tr(
+                    args: [
+                      '${planItem.target.sets}',
+                      '${planItem.target.repetitionsPerSet}',
+                    ],
+                  ),
                 ),
                 _PlanChip(
                   icon: Icons.schedule,
@@ -436,7 +458,9 @@ class _NextExerciseCard extends StatelessWidget {
                 ),
                 _PlanChip(
                   icon: Icons.tune,
-                  label: 'Hỗ trợ ${_assistanceLabel(planItem.assistanceLevel)}',
+                  label: LocaleKeys.Patient_Home_Assistance.tr(
+                    args: [_assistanceLabel(planItem.assistanceLevel)],
+                  ),
                 ),
               ],
             ),
@@ -444,9 +468,9 @@ class _NextExerciseCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () {},
+                onPressed: () => context.router.push(const TrainingRoute()),
                 icon: const Icon(Icons.play_arrow),
-                label: const Text('Bắt đầu bài tập'),
+                label: Text(LocaleKeys.Patient_Home_StartExercise.tr()),
               ),
             ),
           ],
@@ -455,13 +479,15 @@ class _NextExerciseCard extends StatelessWidget {
     );
   }
 
-  String _minutesLabel(int seconds) => 'khoảng ${(seconds / 60).round()} phút';
+  String _minutesLabel(int seconds) => LocaleKeys.Common_ApproxMinutes.tr(
+        args: ['${(seconds / 60).round()}'],
+      );
 
   String _assistanceLabel(String value) {
     return switch (value) {
-      'low' => 'thấp',
-      'medium' => 'vừa',
-      'high' => 'cao',
+      'low' => LocaleKeys.Patient_Home_AssistanceLow.tr(),
+      'medium' => LocaleKeys.Patient_Home_AssistanceMedium.tr(),
+      'high' => LocaleKeys.Patient_Home_AssistanceHigh.tr(),
       _ => value,
     };
   }
@@ -499,18 +525,18 @@ class _EmptyPlanCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Hôm nay chưa có bài tập',
+              LocaleKeys.Patient_Home_NoExerciseTitle.tr(),
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     color: Theme.of(context).colorScheme.onSecondaryContainer,
                   ),
             ),
             const SizedBox(height: 8),
-            const Text('Bạn có thể xem danh sách bài tập đã được duyệt.'),
+            Text(LocaleKeys.Patient_Home_NoExerciseSubtitle.tr()),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
-              onPressed: () {},
+              onPressed: () => context.router.push(const TrainingRoute()),
               icon: const Icon(Icons.fitness_center),
-              label: const Text('Xem bài tập'),
+              label: Text(LocaleKeys.Common_ViewExercises.tr()),
             ),
           ],
         ),
@@ -581,8 +607,12 @@ class _AlertPreview extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Text(alert.title)),
           TextButton(
-            onPressed: () {},
-            child: const Text('Xem'),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PatientNotificationsPage(),
+              ),
+            ),
+            child: Text(LocaleKeys.Common_View.tr()),
           ),
         ],
       ),
@@ -602,11 +632,11 @@ class _NoAlertPreview extends StatelessWidget {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
-      child: const Row(
+      child: Row(
         children: [
-          Icon(Icons.check_circle_outline),
-          SizedBox(width: 12),
-          Expanded(child: Text('Không có cảnh báo cần xem.')),
+          const Icon(Icons.check_circle_outline),
+          const SizedBox(width: 12),
+          Expanded(child: Text(LocaleKeys.Patient_Home_NoAlerts.tr())),
         ],
       ),
     );

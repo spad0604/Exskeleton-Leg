@@ -44,11 +44,19 @@ class SplashBloc extends Bloc<SplashEvent, SplashState> {
       status: SplashStatus.loading,
     ));
 
-    final account = await _verifyLoginStatus();
+    try {
+      final account = await _verifyLoginStatus();
 
-    emit(state.copyWith(
-      status: SplashStatus.success,
-      account: account,
-    ));
+      emit(state.copyWith(
+        status: SplashStatus.success,
+        account: account,
+      ));
+    } on Object catch (error) {
+      final exception = BaseException.from(error);
+      emit(state.copyWith(
+        status: SplashStatus.failure,
+        error: exception,
+      ));
+    }
   }
 }
