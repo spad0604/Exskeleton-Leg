@@ -16,6 +16,12 @@
     "View": "Xem",
     "ViewExercises": "Xem bài tập",
     "Notifications": "Thông báo",
+    "Locale": "Mã ngôn ngữ",
+    "Timezone": "Múi giờ",
+    "Ok": "Đã hiểu",
+    "Description": "Mô tả",
+    "Instructions": "Hướng dẫn",
+    "Safety": "An toàn",
     "Logout": "Đăng xuất",
     "LoggingOut": "Đang đăng xuất",
     "Language": "Ngôn ngữ",
@@ -26,6 +32,57 @@
     "ApproxMinutes": "Khoảng {} phút",
     "SetsReps": "{} hiệp x {} lần",
     "ProviderComingSoon": "{} sẽ được hỗ trợ trong bản tiếp theo."
+  },
+  "Exercises": {
+    "Disclaimer": "Chỉ tập các bài đã được chuyên viên duyệt cho bạn. Dừng lại nếu đau, chóng mặt hoặc chân yếu đột ngột.",
+    "SitToStand": {
+      "Name": "Đứng lên và ngồi xuống",
+      "Description": "Tăng sức mạnh chân cho động tác chuyển tư thế có kiểm soát.",
+      "Instructions": "Ngồi gần mép ghế chắc chắn. Đặt hai bàn chân dưới đầu gối, nghiêng người về trước và đứng lên chậm. Đưa người về ghế rồi ngồi xuống có kiểm soát.",
+      "Safety": "Giữ ghế phía sau và dùng tay vịn hoặc điểm tựa chắc chắn khi cần. Không vội và không để đầu gối đổ vào trong."
+    },
+    "SupportedKneeRaise": {
+      "Name": "Nâng gối có hỗ trợ",
+      "Description": "Luyện gấp hông và chuyển trọng lượng khi đứng.",
+      "Instructions": "Đứng thẳng và vịn vào điểm tựa chắc chắn. Từ từ nâng một gối, hạ xuống rồi đổi bên.",
+      "Safety": "Luôn giữ hai tay hoặc điểm tựa theo chỉ định. Giữ thân người thẳng và dừng lại nếu mất an toàn thăng bằng."
+    },
+    "SeatedKneeExtension": {
+      "Name": "Duỗi gối khi ngồi",
+      "Description": "Kích hoạt cơ đùi trước bằng chuyển động ngồi có kiểm soát.",
+      "Instructions": "Ngồi thẳng, hai bàn chân được đỡ. Từ từ duỗi một gối, giữ ngắn rồi hạ chân xuống có kiểm soát.",
+      "Safety": "Chỉ vận động trong biên độ thoải mái do chuyên viên chỉ định. Không đá chân hoặc khóa gối mạnh."
+    },
+    "HeelRaises": {
+      "Name": "Nhón gót có điểm tựa",
+      "Description": "Tăng sức mạnh cơ bắp chân để hỗ trợ đứng và đi.",
+      "Instructions": "Đứng sau ghế chắc chắn hoặc cạnh bàn. Từ từ nhón lên mũi chân, giữ ngắn rồi hạ gót xuống có kiểm soát.",
+      "Safety": "Dùng điểm tựa trong suốt bài tập. Giữ trọng lượng đều và không tập không có hỗ trợ nếu thăng bằng hạn chế."
+    },
+    "StraightLegRaise": {
+      "Name": "Nâng chân thẳng",
+      "Description": "Tăng kiểm soát cơ đùi trước mà không lặp lại động tác gập gối.",
+      "Instructions": "Nằm ngửa, một gối co và chân kia duỗi. Siết cơ đùi, từ từ nâng chân thẳng rồi hạ xuống.",
+      "Safety": "Giữ gối thẳng nhưng không ép. Dừng lại nếu đau tăng hoặc không kiểm soát được chân."
+    },
+    "HeelSlides": {
+      "Name": "Trượt gót chân",
+      "Description": "Tập gập và duỗi gối nhẹ nhàng ở tư thế được hỗ trợ.",
+      "Instructions": "Nằm ngửa. Trượt một gót chân về phía người để gập gối, sau đó từ từ trượt ra để duỗi.",
+      "Safety": "Chỉ tập trong biên độ thoải mái và không ép gối qua điểm đau hoặc điểm cứng."
+    },
+    "QuadSet": {
+      "Name": "Siết cơ đùi tĩnh",
+      "Description": "Khôi phục khả năng kích hoạt cơ đùi trước.",
+      "Instructions": "Nằm hoặc ngồi với chân duỗi. Siết nhẹ mặt trước đùi bằng cách ấn gối xuống, giữ ngắn rồi thả lỏng.",
+      "Safety": "Co cơ nhẹ trong mức thoải mái. Không nín thở hoặc ấn quá mạnh làm đau tăng."
+    },
+    "SupportedHipExtension": {
+      "Name": "Duỗi hông có điểm tựa",
+      "Description": "Tăng sức mạnh cơ duỗi hông khi đứng có hỗ trợ.",
+      "Instructions": "Vịn vào điểm tựa chắc chắn, giữ thân thẳng. Đưa một chân duỗi nhẹ ra sau không ưỡn lưng rồi trở về chậm.",
+      "Safety": "Giữ biên độ nhỏ và có kiểm soát. Không nghiêng người về trước hoặc tập không hỗ trợ nếu thăng bằng hạn chế."
+    }
   },
   "Auth": {
     "Login": {
@@ -66,9 +123,13 @@
     "Training": {
       "Today": "Hôm nay",
       "All": "Tất cả",
-      "PendingTitle": "3 bài đang chờ",
+      "PendingTitle": "{} bài đang chờ",
       "PendingSubtitle": "Ưu tiên bài hôm nay và kiểm tra thiết bị trước khi tập.",
-      "ViewExerciseTooltip": "Xem bài tập"
+      "ViewExerciseTooltip": "Xem bài tập",
+      "Planned": "Đã lên lịch",
+      "InProgress": "Đang tập",
+      "Completed": "Đã hoàn thành",
+      "Skipped": "Đã bỏ qua"
     },
     "Progress": {
       "Week": "Tuần",
@@ -78,8 +139,8 @@
       "CorrectMoves": "Động tác đạt",
       "StreakDays": "Chuỗi tập: {} ngày",
       "RecentHistory": "Lịch sử gần đây",
-      "HeroTitle": "Tuần này ổn định hơn",
-      "HeroSubtitle": "Hoàn thành tăng 12% so với tuần trước.",
+      "HeroTitle": "Đã hoàn thành {} / {} bài",
+      "HeroSubtitle": "Tiến độ mới nhất trong khoảng thời gian đã chọn.",
       "SessionSitStand": "Đứng lên và ngồi xuống",
       "SessionSitStandSubtitle": "Hôm nay - Hoàn thành 15 / 16 lần",
       "SessionHipExtension": "Duỗi hông chậm",
@@ -98,7 +159,7 @@
       "Calibrate": "Hiệu chỉnh",
       "Diagnostics": "Chẩn đoán",
       "HeroTitle": "Exoskeleton đang kết nối",
-      "HeroSubtitle": "Pin 78% - cảm biến sẵn sàng",
+      "HeroSubtitle": "Pin {}% - {}",
       "ViewDeviceTooltip": "Xem thiết bị",
       "PairDeviceTitle": "Chưa ghép thiết bị",
       "PairDeviceMessage": "Ghép thiết bị để bắt đầu bài tập có hỗ trợ.",

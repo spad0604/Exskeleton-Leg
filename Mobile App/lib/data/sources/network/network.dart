@@ -51,10 +51,20 @@ class NetworkDataSource {
     return _dataList(response.data);
   }
 
-  Future<Map<String, dynamic>> getProgressOverview(String patientId) async {
+  Future<List<Map<String, dynamic>>> getPlanItems(String patientId,
+      {String scope = 'today'}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/plan-items',
+      queryParameters: {'scope': scope},
+    );
+    return _dataList(response.data);
+  }
+
+  Future<Map<String, dynamic>> getProgressOverview(String patientId,
+      {String period = 'week'}) async {
     final response = await _dio.get<Map<String, dynamic>>(
       'patients/$patientId/progress/overview',
-      queryParameters: {'period': 'week'},
+      queryParameters: {'period': period},
     );
     return _data(response.data);
   }
@@ -72,6 +82,11 @@ class NetworkDataSource {
       'me/fcm-token',
       data: {'token': token, 'platform': 'android'},
     );
+  }
+
+  Future<List<Map<String, dynamic>>> getNotifications() async {
+    final response = await _dio.get<Map<String, dynamic>>('me/notifications');
+    return _dataList(response.data);
   }
 
   Future<Map<String, dynamic>> getPatient(String patientId) async {

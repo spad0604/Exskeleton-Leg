@@ -3,6 +3,7 @@ import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/data/repositories/auth_repository/auth_repository.dart';
+import 'package:flutter_starter/data/entities/account.dart';
 import 'package:flutter_starter/data/states/auth/auth_bloc.dart';
 import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/data/sources/network/network.dart';
@@ -18,42 +19,172 @@ class TrainingPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final patientId = context.read<AuthBloc>().state.account?.id;
-    return _PatientApiView<List<Map<String, dynamic>>>(
-      title: LocaleKeys.Patient_Tabs_Training.tr(),
-      load: () =>
-          provider.get<NetworkDataSource>().getTodayPlanItems(patientId!),
-      builder: (items) => [
-        const _TrainingHero(),
-        const SizedBox(height: 16),
-        _SegmentHeader(labels: [
-          LocaleKeys.Patient_Training_Today.tr(),
-          LocaleKeys.Patient_Training_All.tr(),
-        ]),
-        const SizedBox(height: 16),
-        for (final item in items) ...[
-          _ExerciseCard(
-            title: (item['exercise'] as Map)['name'] as String,
-            subtitle: LocaleKeys.Common_SetsReps.tr(
-              args: [
-                '${(item['target'] as Map)['sets']}',
-                '${(item['target'] as Map)['repetitions_per_set']}',
-              ],
-            ),
-            meta: LocaleKeys.Common_ApproxMinutes.tr(
-              args: [
-                '${((item['estimated_duration_seconds'] as num) / 60).round()}',
-              ],
-            ),
-            chip: LocaleKeys.Patient_Training_Today.tr(),
-            icon: Icons.accessibility_new,
-            accent: _AccentTone.primary,
-            progress: 0,
-          ),
-          const SizedBox(height: 12),
-        ],
-      ],
-    );
+    return _PlanListView(patientId: patientId!);
   }
+}
+
+class _PlanListView extends StatefulWidget {
+  final String patientId;
+  const _PlanListView({required this.patientId});
+
+  @override
+  State<_PlanListView> createState() => _PlanListViewState();
+}
+
+class _PlanListViewState extends State<_PlanListView> {
+  int _selectedIndex = 0;
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = provider.get<NetworkDataSource>().getPlanItems(
+          widget.patientId,
+          scope: _selectedIndex == 0 ? 'today' : 'all',
+        );
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FutureBuilder<List<Map<String, dynamic>>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return _PatientTabScaffold(
+              title: LocaleKeys.Patient_Tabs_Training.tr(),
+              children: [
+                if (snapshot.hasError)
+                  FilledButton(
+                      onPressed: () => setState(_load),
+                      child: Text(LocaleKeys.Common_Retry.tr()))
+                else
+                  const Center(child: CircularProgressIndicator())
+              ],
+            );
+          }
+          final items = snapshot.data!;
+          return _PatientTabScaffold(
+            title: LocaleKeys.Patient_Tabs_Training.tr(),
+            children: [
+              _TrainingHero(pendingCount: items.length),
+              const SizedBox(height: 16),
+              _SegmentHeader(
+                  selectedIndex: _selectedIndex,
+                  onChanged: (index) => setState(() {
+                        _selectedIndex = index;
+                        _load();
+                      }),
+                  labels: [
+                    LocaleKeys.Patient_Training_Today.tr(),
+                    LocaleKeys.Patient_Training_All.tr(),
+                  ]),
+              const SizedBox(height: 16),
+              for (final item in items) ...[
+                _ExerciseCard(
+                  title: _localizedExerciseName(item['exercise'] as Map),
+                  subtitle: LocaleKeys.Common_SetsReps.tr(
+                    args: [
+                      '${(item['target'] as Map)['sets']}',
+                      '${(item['target'] as Map)['repetitions_per_set']}',
+                    ],
+                  ),
+                  meta: LocaleKeys.Common_ApproxMinutes.tr(
+                    args: [
+                      '${((item['estimated_duration_seconds'] as num) / 60).round()}',
+                    ],
+                  ),
+                  chip: _selectedIndex == 0
+                      ? LocaleKeys.Patient_Training_Today.tr()
+                      : _localizedTrainingStatus('${item['status']}'),
+                  icon: Icons.accessibility_new,
+                  accent: _AccentTone.primary,
+                  progress: 0,
+                  onTap: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => _ExerciseDetailPage(
+                        exercise: item['exercise'] as Map,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+              ],
+            ],
+          );
+        },
+      );
+}
+
+String _localizedExerciseName(Map exercise) {
+  return _localizedExerciseCopy(exercise, 'name');
+}
+
+String _localizedExerciseCopy(Map exercise, String field) {
+  final code = exercise['code'];
+  final key = switch ('$code:$field') {
+    'sit_to_stand:name' => LocaleKeys.Exercises_SitToStand_Name,
+    'sit_to_stand:description' => LocaleKeys.Exercises_SitToStand_Description,
+    'sit_to_stand:instructions' => LocaleKeys.Exercises_SitToStand_Instructions,
+    'sit_to_stand:safety' => LocaleKeys.Exercises_SitToStand_Safety,
+    'supported_knee_raise:name' => LocaleKeys.Exercises_SupportedKneeRaise_Name,
+    'supported_knee_raise:description' =>
+      LocaleKeys.Exercises_SupportedKneeRaise_Description,
+    'supported_knee_raise:instructions' =>
+      LocaleKeys.Exercises_SupportedKneeRaise_Instructions,
+    'supported_knee_raise:safety' =>
+      LocaleKeys.Exercises_SupportedKneeRaise_Safety,
+    'seated_knee_extension:name' =>
+      LocaleKeys.Exercises_SeatedKneeExtension_Name,
+    'seated_knee_extension:description' =>
+      LocaleKeys.Exercises_SeatedKneeExtension_Description,
+    'seated_knee_extension:instructions' =>
+      LocaleKeys.Exercises_SeatedKneeExtension_Instructions,
+    'seated_knee_extension:safety' =>
+      LocaleKeys.Exercises_SeatedKneeExtension_Safety,
+    'heel_raises:name' => LocaleKeys.Exercises_HeelRaises_Name,
+    'heel_raises:description' => LocaleKeys.Exercises_HeelRaises_Description,
+    'heel_raises:instructions' => LocaleKeys.Exercises_HeelRaises_Instructions,
+    'heel_raises:safety' => LocaleKeys.Exercises_HeelRaises_Safety,
+    'straight_leg_raise:name' => LocaleKeys.Exercises_StraightLegRaise_Name,
+    'straight_leg_raise:description' =>
+      LocaleKeys.Exercises_StraightLegRaise_Description,
+    'straight_leg_raise:instructions' =>
+      LocaleKeys.Exercises_StraightLegRaise_Instructions,
+    'straight_leg_raise:safety' => LocaleKeys.Exercises_StraightLegRaise_Safety,
+    'heel_slides:name' => LocaleKeys.Exercises_HeelSlides_Name,
+    'heel_slides:description' => LocaleKeys.Exercises_HeelSlides_Description,
+    'heel_slides:instructions' => LocaleKeys.Exercises_HeelSlides_Instructions,
+    'heel_slides:safety' => LocaleKeys.Exercises_HeelSlides_Safety,
+    'quad_set:name' => LocaleKeys.Exercises_QuadSet_Name,
+    'quad_set:description' => LocaleKeys.Exercises_QuadSet_Description,
+    'quad_set:instructions' => LocaleKeys.Exercises_QuadSet_Instructions,
+    'quad_set:safety' => LocaleKeys.Exercises_QuadSet_Safety,
+    'supported_hip_extension:name' =>
+      LocaleKeys.Exercises_SupportedHipExtension_Name,
+    'supported_hip_extension:description' =>
+      LocaleKeys.Exercises_SupportedHipExtension_Description,
+    'supported_hip_extension:instructions' =>
+      LocaleKeys.Exercises_SupportedHipExtension_Instructions,
+    'supported_hip_extension:safety' =>
+      LocaleKeys.Exercises_SupportedHipExtension_Safety,
+    _ => null,
+  };
+  final fallbackField = field == 'name' ? 'name' : '${field}_key';
+  return key == null ? '${exercise[fallbackField] ?? ''}' : key.tr();
+}
+
+String _localizedTrainingStatus(String status) {
+  return switch (status) {
+    'planned' => LocaleKeys.Patient_Training_Planned.tr(),
+    'in_progress' => LocaleKeys.Patient_Training_InProgress.tr(),
+    'completed' => LocaleKeys.Patient_Training_Completed.tr(),
+    'skipped' => LocaleKeys.Patient_Training_Skipped.tr(),
+    _ => status,
+  };
 }
 
 @RoutePage()
@@ -63,72 +194,123 @@ class ProgressPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final patientId = context.read<AuthBloc>().state.account?.id;
-    return _PatientApiView<Map<String, dynamic>>(
-      title: LocaleKeys.Patient_Tabs_Progress.tr(),
-      load: () =>
-          provider.get<NetworkDataSource>().getProgressOverview(patientId!),
-      builder: (data) => [
-        const _ProgressHero(),
-        const SizedBox(height: 16),
-        _SegmentHeader(labels: [
-          LocaleKeys.Patient_Progress_Week.tr(),
-          LocaleKeys.Patient_Progress_Month.tr(),
-        ]),
-        const SizedBox(height: 16),
-        Row(
-          children: [
-            Expanded(
-              child: _MetricCard(
-                label: LocaleKeys.Patient_Progress_Completed.tr(),
-                value: '${data['completed_count']} / ${data['planned_count']}',
-                assetPath: 'assets/images/ic_calendar.png',
-                accent: _AccentTone.primary,
-              ),
-            ),
-            SizedBox(width: 12),
-            Expanded(
-              child: _MetricCard(
-                label: LocaleKeys.Patient_Progress_TrainingTime.tr(),
-                value: LocaleKeys.Common_Minutes.tr(args: [
-                  '${((data['active_seconds'] as num) / 60).round()}',
-                ]),
-                assetPath: 'assets/images/ic_clock.png',
-                accent: _AccentTone.tertiary,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _MetricCard(
-          label: LocaleKeys.Patient_Progress_CorrectMoves.tr(),
-          value: '${((data['correctness_ratio'] as num) * 100).round()}%',
-          assetPath: 'assets/images/ic_heart_circle.png',
-          accent: _AccentTone.neutral,
-        ),
-        const SizedBox(height: 24),
-        Text(
-            LocaleKeys.Patient_Progress_StreakDays.tr(
-              args: ['${data['streak_days']}'],
-            ),
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 24),
-        Text(LocaleKeys.Patient_Progress_RecentHistory.tr(),
-            style: Theme.of(context).textTheme.titleLarge),
-        const SizedBox(height: 8),
-        _SessionTile(
-          title: LocaleKeys.Patient_Progress_SessionSitStand.tr(),
-          subtitle: LocaleKeys.Patient_Progress_SessionSitStandSubtitle.tr(),
-          icon: Icons.done,
-        ),
-        _SessionTile(
-          title: LocaleKeys.Patient_Progress_SessionHipExtension.tr(),
-          subtitle:
-              LocaleKeys.Patient_Progress_SessionHipExtensionSubtitle.tr(),
-          icon: Icons.report_gmailerrorred_outlined,
-        ),
-      ],
-    );
+    return _ProgressView(patientId: patientId!);
   }
+}
+
+class _ProgressView extends StatefulWidget {
+  final String patientId;
+  const _ProgressView({required this.patientId});
+  @override
+  State<_ProgressView> createState() => _ProgressViewState();
+}
+
+class _ProgressViewState extends State<_ProgressView> {
+  int _selectedIndex = 0;
+  late Future<Map<String, dynamic>> _future;
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() => _future = provider
+      .get<NetworkDataSource>()
+      .getProgressOverview(widget.patientId,
+          period: _selectedIndex == 0 ? 'week' : 'month');
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
+        future: _future,
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return _PatientTabScaffold(
+                title: LocaleKeys.Patient_Tabs_Progress.tr(),
+                children: [
+                  if (snapshot.hasError)
+                    FilledButton(
+                        onPressed: () => setState(_load),
+                        child: Text(LocaleKeys.Common_Retry.tr()))
+                  else
+                    const Center(child: CircularProgressIndicator())
+                ]);
+          }
+          final data = snapshot.data!;
+          return _PatientTabScaffold(
+              title: LocaleKeys.Patient_Tabs_Progress.tr(),
+              children: [
+                _ProgressHero(
+                  completed: (data['completed_count'] as num?)?.toInt() ?? 0,
+                  planned: (data['planned_count'] as num?)?.toInt() ?? 0,
+                ),
+                const SizedBox(height: 16),
+                _SegmentHeader(
+                    selectedIndex: _selectedIndex,
+                    onChanged: (index) => setState(() {
+                          _selectedIndex = index;
+                          _load();
+                        }),
+                    labels: [
+                      LocaleKeys.Patient_Progress_Week.tr(),
+                      LocaleKeys.Patient_Progress_Month.tr(),
+                    ]),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MetricCard(
+                        label: LocaleKeys.Patient_Progress_Completed.tr(),
+                        value:
+                            '${data['completed_count']} / ${data['planned_count']}',
+                        assetPath: 'assets/images/ic_calendar.png',
+                        accent: _AccentTone.primary,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: _MetricCard(
+                        label: LocaleKeys.Patient_Progress_TrainingTime.tr(),
+                        value: LocaleKeys.Common_Minutes.tr(args: [
+                          '${((data['active_seconds'] as num) / 60).round()}',
+                        ]),
+                        assetPath: 'assets/images/ic_clock.png',
+                        accent: _AccentTone.tertiary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _MetricCard(
+                  label: LocaleKeys.Patient_Progress_CorrectMoves.tr(),
+                  value:
+                      '${((data['correctness_ratio'] as num) * 100).round()}%',
+                  assetPath: 'assets/images/ic_heart_circle.png',
+                  accent: _AccentTone.neutral,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                    LocaleKeys.Patient_Progress_StreakDays.tr(
+                      args: ['${data['streak_days']}'],
+                    ),
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 24),
+                Text(LocaleKeys.Patient_Progress_RecentHistory.tr(),
+                    style: Theme.of(context).textTheme.titleLarge),
+                const SizedBox(height: 8),
+                ...((data['recent_sessions'] as List<dynamic>? ?? const [])
+                    .whereType<Map<String, dynamic>>()
+                    .map((session) => _SessionTile(
+                          title: '${session['status']}',
+                          subtitle: '${session['started_at']}',
+                          icon: session['status'] == 'completed'
+                              ? Icons.done
+                              : Icons.info_outline,
+                        ))),
+                if ((data['recent_sessions'] as List<dynamic>? ?? const [])
+                    .isEmpty)
+                  Text(LocaleKeys.Common_NotEnoughData.tr()),
+              ]);
+        },
+      );
 }
 
 @RoutePage()
@@ -147,7 +329,11 @@ class DevicePage extends StatelessWidget {
         }
         final device = items.first;
         return [
-          const _DeviceHero(),
+          _DeviceHero(
+            model: '${device['model'] ?? ''}',
+            battery: (device['battery_percent'] as num?)?.toInt() ?? 0,
+            ready: (device['readiness'] as Map?)?['state'] == 'ready',
+          ),
           const SizedBox(height: 16),
           _StatusBanner(
             assetPath: 'assets/images/ic_fill_setting.png',
@@ -235,61 +421,88 @@ class _PatientApiViewState<T> extends State<_PatientApiView<T>> {
       );
 }
 
-class PatientNotificationsPage extends StatelessWidget {
+class PatientNotificationsPage extends StatefulWidget {
   const PatientNotificationsPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final items = [
-      _NotificationItem(
-        icon: Icons.warning_amber_rounded,
-        title: LocaleKeys.Patient_Notifications_SafetyTitle.tr(),
-        body: LocaleKeys.Patient_Notifications_SafetyBody.tr(),
-        time: LocaleKeys.Patient_Notifications_SafetyTime.tr(),
-        tone: _AccentTone.tertiary,
-        unread: true,
-      ),
-      _NotificationItem(
-        icon: Icons.fitness_center,
-        title: LocaleKeys.Patient_Notifications_TrainingTitle.tr(),
-        body: LocaleKeys.Patient_Notifications_TrainingBody.tr(),
-        time: LocaleKeys.Patient_Notifications_TrainingTime.tr(),
-        tone: _AccentTone.primary,
-        unread: true,
-      ),
-      _NotificationItem(
-        icon: Icons.battery_charging_full,
-        title: LocaleKeys.Patient_Notifications_DeviceTitle.tr(),
-        body: LocaleKeys.Patient_Notifications_DeviceBody.tr(),
-        time: LocaleKeys.Patient_Notifications_DeviceTime.tr(),
-        tone: _AccentTone.secondary,
-        unread: false,
-      ),
-      _NotificationItem(
-        icon: Icons.groups_outlined,
-        title: LocaleKeys.Patient_Notifications_CareTitle.tr(),
-        body: LocaleKeys.Patient_Notifications_CareBody.tr(),
-        time: LocaleKeys.Patient_Notifications_CareTime.tr(),
-        tone: _AccentTone.neutral,
-        unread: false,
-      ),
-    ];
+  State<PatientNotificationsPage> createState() =>
+      _PatientNotificationsPageState();
+}
 
-    return _PatientTabScaffold(
-      title: LocaleKeys.Common_Notifications.tr(),
-      children: [
-        _NotificationSummary(unreadCount: items.where((e) => e.unread).length),
-        const SizedBox(height: 16),
-        _SegmentHeader(labels: [
-          LocaleKeys.Patient_Notifications_All.tr(),
-          LocaleKeys.Patient_Notifications_Unread.tr(),
-        ]),
-        const SizedBox(height: 16),
-        for (final item in items) ...[
-          _NotificationBlock(item: item),
-          const SizedBox(height: 12),
-        ],
-      ],
+class _PatientNotificationsPageState extends State<PatientNotificationsPage> {
+  late Future<List<Map<String, dynamic>>> _future;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  void _load() {
+    _future = provider.get<NetworkDataSource>().getNotifications();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: _future,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState != ConnectionState.done) {
+          return _PatientTabScaffold(
+            title: LocaleKeys.Common_Notifications.tr(),
+            children: [Center(child: CircularProgressIndicator())],
+          );
+        }
+        if (snapshot.hasError) {
+          return _PatientTabScaffold(
+            title: LocaleKeys.Common_Notifications.tr(),
+            children: [
+              Center(child: Text(LocaleKeys.Patient_Home_LoadFailedTitle.tr())),
+              const SizedBox(height: 12),
+              FilledButton(
+                  onPressed: () => setState(_load),
+                  child: Text(LocaleKeys.Common_Retry.tr())),
+            ],
+          );
+        }
+        final items =
+            (snapshot.data ?? const <Map<String, dynamic>>[]).map((item) {
+          final severity = item['severity'] as String? ?? 'info';
+          return _NotificationItem(
+            icon: severity == 'warning'
+                ? Icons.warning_amber_rounded
+                : Icons.notifications,
+            title: item['title'] as String? ?? '',
+            body: item['title'] as String? ?? '',
+            time: item['occurred_at'] as String? ?? '',
+            tone: severity == 'critical'
+                ? _AccentTone.tertiary
+                : _AccentTone.primary,
+            unread: item['resolved_at'] == null,
+          );
+        }).toList();
+        return _PatientTabScaffold(
+          title: LocaleKeys.Common_Notifications.tr(),
+          children: [
+            _NotificationSummary(
+                unreadCount: items.where((e) => e.unread).length),
+            const SizedBox(height: 16),
+            if (items.isEmpty)
+              Center(child: Text(LocaleKeys.Patient_Device_NoDevice.tr()))
+            else ...[
+              _SegmentHeader(labels: [
+                LocaleKeys.Patient_Notifications_All.tr(),
+                LocaleKeys.Patient_Notifications_Unread.tr()
+              ]),
+              const SizedBox(height: 16),
+              for (final item in items) ...[
+                _NotificationBlock(item: item),
+                const SizedBox(height: 12)
+              ],
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -300,6 +513,200 @@ class ProfilePage extends StatefulWidget {
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
+}
+
+void _openProfileInfo(BuildContext context, String title, String subtitle) {
+  Navigator.of(context).push(
+    MaterialPageRoute<void>(
+      builder: (_) => _ProfileInfoPage(title: title, subtitle: subtitle),
+    ),
+  );
+}
+
+class _ProfileInfoPage extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _ProfileInfoPage({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: scheme.surface,
+      appBar: AppBar(title: Text(title)),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primaryContainer, scheme.secondaryContainer],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                CircleAvatar(
+                  radius: 28,
+                  backgroundColor: scheme.primary,
+                  child: Icon(Icons.person_outline,
+                      color: scheme.onPrimary, size: 30),
+                ),
+                const SizedBox(height: 18),
+                Text(title,
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text(subtitle, style: Theme.of(context).textTheme.bodyLarge),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: ListTile(
+                leading: _TintIcon(
+                  icon: Icons.info_outline,
+                  background: scheme.tertiaryContainer,
+                  foreground: scheme.tertiary,
+                  size: 48,
+                ),
+                title: Text(title),
+                subtitle: Text(subtitle),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+void _openAccountDetails(BuildContext context, Account? account) {
+  if (account == null) return;
+  Navigator.of(context).push(MaterialPageRoute<void>(
+    builder: (_) => _AccountDetailsPage(account: account),
+  ));
+}
+
+class _AccountDetailsPage extends StatelessWidget {
+  final Account account;
+  const _AccountDetailsPage({required this.account});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Scaffold(
+      backgroundColor: scheme.surface,
+      appBar:
+          AppBar(title: Text(LocaleKeys.Patient_Profile_PersonalProfile.tr())),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(22),
+            decoration: BoxDecoration(
+                color: scheme.primaryContainer,
+                borderRadius: BorderRadius.circular(28)),
+            child: Row(children: [
+              CircleAvatar(
+                  radius: 34,
+                  backgroundColor: scheme.primary,
+                  child: Text(
+                      account.displayName.characters.first.toUpperCase(),
+                      style: TextStyle(
+                          color: scheme.onPrimary,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w800))),
+              const SizedBox(width: 16),
+              Expanded(
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    Text(account.displayName,
+                        style: Theme.of(context)
+                            .textTheme
+                            .titleLarge
+                            ?.copyWith(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 4),
+                    Text(account.email ?? '—', overflow: TextOverflow.ellipsis),
+                  ])),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          _AccountField(
+              icon: Icons.badge_outlined,
+              label: LocaleKeys.Patient_Profile_Role.tr(),
+              value: account.roles.join(', '),
+              accent: _AccentTone.primary),
+          _AccountField(
+              icon: Icons.email_outlined,
+              label: LocaleKeys.Common_Email.tr(),
+              value: account.email ?? '—',
+              accent: _AccentTone.secondary),
+          _AccountField(
+              icon: Icons.language_outlined,
+              label: LocaleKeys.Common_Locale.tr(),
+              value: account.locale ?? '—',
+              accent: _AccentTone.tertiary),
+          _AccountField(
+              icon: Icons.schedule_outlined,
+              label: LocaleKeys.Common_Timezone.tr(),
+              value: account.timezone ?? '—',
+              accent: _AccentTone.neutral),
+          _AccountField(
+              icon: Icons.verified_user_outlined,
+              label: LocaleKeys.Patient_Profile_Status.tr(),
+              value: LocaleKeys.Patient_Profile_Active.tr(),
+              accent: _AccentTone.secondary),
+        ],
+      ),
+    );
+  }
+}
+
+class _AccountField extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final _AccentTone accent;
+  const _AccountField(
+      {required this.icon,
+      required this.label,
+      required this.value,
+      required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _accentColors(Theme.of(context).colorScheme, accent);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: colors.background,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
+      ),
+      child: ListTile(
+        leading: _TintIcon(
+            icon: icon,
+            background: colors.background,
+            foreground: colors.foreground,
+            size: 48),
+        title: Text(label),
+        subtitle: Text(value),
+      ),
+    );
+  }
 }
 
 class _ProfilePageState extends State<ProfilePage> {
@@ -357,7 +764,8 @@ class _ProfilePageState extends State<ProfilePage> {
           items: [
             _ProfileInfoItem(
               label: LocaleKeys.Patient_Profile_Role.tr(),
-              value: LocaleKeys.Patient_Profile_PatientAccount.tr(),
+              value: account?.roles.join(', ') ??
+                  LocaleKeys.Patient_Profile_PatientAccount.tr(),
               icon: Icons.badge_outlined,
               accent: _AccentTone.primary,
             ),
@@ -377,11 +785,16 @@ class _ProfilePageState extends State<ProfilePage> {
               assetPath: 'assets/images/ic_indentity.png',
               label: LocaleKeys.Patient_Profile_PersonalProfile.tr(),
               subtitle: LocaleKeys.Patient_Profile_PersonalProfileSubtitle.tr(),
+              onTap: () => _openAccountDetails(context, account),
             ),
             _MenuTile(
               assetPath: 'assets/images/ic_phone.png',
               label: LocaleKeys.Patient_Profile_CareNetwork.tr(),
               subtitle: LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
+              onTap: () => _openProfileInfo(
+                  context,
+                  LocaleKeys.Patient_Profile_CareNetwork.tr(),
+                  LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr()),
             ),
           ],
         ),
@@ -404,16 +817,28 @@ class _ProfilePageState extends State<ProfilePage> {
               assetPath: 'assets/images/ic_heart_circle.png',
               label: LocaleKeys.Patient_Profile_Accessibility.tr(),
               subtitle: LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr(),
+              onTap: () => _openProfileInfo(
+                  context,
+                  LocaleKeys.Patient_Profile_Accessibility.tr(),
+                  LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr()),
             ),
             _MenuTile(
               assetPath: 'assets/images/ic_fill_indentity.png',
               label: LocaleKeys.Patient_Profile_Privacy.tr(),
               subtitle: LocaleKeys.Patient_Profile_PrivacySubtitle.tr(),
+              onTap: () => _openProfileInfo(
+                  context,
+                  LocaleKeys.Patient_Profile_Privacy.tr(),
+                  LocaleKeys.Patient_Profile_PrivacySubtitle.tr()),
             ),
             _MenuTile(
               assetPath: 'assets/images/ic_fill_help.png',
               label: LocaleKeys.Patient_Profile_Help.tr(),
               subtitle: LocaleKeys.Patient_Profile_HelpSubtitle.tr(),
+              onTap: () => _openProfileInfo(
+                  context,
+                  LocaleKeys.Patient_Profile_Help.tr(),
+                  LocaleKeys.Patient_Profile_HelpSubtitle.tr()),
             ),
           ],
         ),
@@ -452,7 +877,9 @@ class _PatientTabScaffold extends StatelessWidget {
 }
 
 class _TrainingHero extends StatelessWidget {
-  const _TrainingHero();
+  final int pendingCount;
+
+  const _TrainingHero({required this.pendingCount});
 
   @override
   Widget build(BuildContext context) {
@@ -478,7 +905,9 @@ class _TrainingHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  LocaleKeys.Patient_Training_PendingTitle.tr(),
+                  LocaleKeys.Patient_Training_PendingTitle.tr(
+                    args: ['$pendingCount'],
+                  ),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800,
@@ -499,7 +928,10 @@ class _TrainingHero extends StatelessWidget {
 }
 
 class _ProgressHero extends StatelessWidget {
-  const _ProgressHero();
+  final int completed;
+  final int planned;
+
+  const _ProgressHero({required this.completed, required this.planned});
 
   @override
   Widget build(BuildContext context) {
@@ -525,7 +957,9 @@ class _ProgressHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  LocaleKeys.Patient_Progress_HeroTitle.tr(),
+                  LocaleKeys.Patient_Progress_HeroTitle.tr(
+                    args: ['$completed', '$planned'],
+                  ),
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onTertiaryContainer,
                         fontWeight: FontWeight.w800,
@@ -546,7 +980,15 @@ class _ProgressHero extends StatelessWidget {
 }
 
 class _DeviceHero extends StatelessWidget {
-  const _DeviceHero();
+  final String model;
+  final int battery;
+  final bool ready;
+
+  const _DeviceHero({
+    required this.model,
+    required this.battery,
+    required this.ready,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -573,7 +1015,7 @@ class _DeviceHero extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  LocaleKeys.Patient_Device_HeroTitle.tr(),
+                  model,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         color: colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.w800,
@@ -581,7 +1023,14 @@ class _DeviceHero extends StatelessWidget {
                 ),
                 const SizedBox(height: 5),
                 Text(
-                  LocaleKeys.Patient_Device_HeroSubtitle.tr(),
+                  LocaleKeys.Patient_Device_HeroSubtitle.tr(
+                    args: [
+                      '$battery',
+                      ready
+                          ? LocaleKeys.Patient_Device_Ready.tr()
+                          : LocaleKeys.Patient_Device_NeedsCheck.tr(),
+                    ],
+                  ),
                   style: TextStyle(color: colorScheme.onPrimaryContainer),
                 ),
               ],
@@ -595,8 +1044,11 @@ class _DeviceHero extends StatelessWidget {
 
 class _SegmentHeader extends StatefulWidget {
   final List<String> labels;
+  final int? selectedIndex;
+  final ValueChanged<int>? onChanged;
 
-  const _SegmentHeader({required this.labels});
+  const _SegmentHeader(
+      {required this.labels, this.selectedIndex, this.onChanged});
 
   @override
   State<_SegmentHeader> createState() => _SegmentHeaderState();
@@ -604,6 +1056,8 @@ class _SegmentHeader extends StatefulWidget {
 
 class _SegmentHeaderState extends State<_SegmentHeader> {
   int _selectedIndex = 0;
+
+  int get selectedIndex => widget.selectedIndex ?? _selectedIndex;
 
   @override
   Widget build(BuildContext context) {
@@ -625,7 +1079,7 @@ class _SegmentHeaderState extends State<_SegmentHeader> {
               AnimatedPositioned(
                 duration: const Duration(milliseconds: 220),
                 curve: Curves.easeOutCubic,
-                left: _selectedIndex * itemWidth + 4,
+                left: selectedIndex * itemWidth + 4,
                 top: 5,
                 bottom: 5,
                 width: itemWidth - 8,
@@ -650,9 +1104,10 @@ class _SegmentHeaderState extends State<_SegmentHeader> {
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
                         onTap: () {
-                          setState(() {
-                            _selectedIndex = entry.$1;
-                          });
+                          widget.onChanged?.call(entry.$1);
+                          if (widget.onChanged == null) {
+                            setState(() => _selectedIndex = entry.$1);
+                          }
                         },
                         child: Center(
                           child: AnimatedDefaultTextStyle(
@@ -661,13 +1116,13 @@ class _SegmentHeaderState extends State<_SegmentHeader> {
                                     .textTheme
                                     .labelLarge
                                     ?.copyWith(
-                                      color: _selectedIndex == entry.$1
+                                      color: selectedIndex == entry.$1
                                           ? colorScheme.onPrimary
                                           : colorScheme.onSurfaceVariant,
                                       fontWeight: FontWeight.w800,
                                     ) ??
                                 TextStyle(
-                                  color: _selectedIndex == entry.$1
+                                  color: selectedIndex == entry.$1
                                       ? colorScheme.onPrimary
                                       : colorScheme.onSurfaceVariant,
                                   fontWeight: FontWeight.w800,
@@ -695,6 +1150,7 @@ class _ExerciseCard extends StatelessWidget {
   final IconData icon;
   final _AccentTone accent;
   final double progress;
+  final VoidCallback onTap;
 
   const _ExerciseCard({
     required this.title,
@@ -704,6 +1160,7 @@ class _ExerciseCard extends StatelessWidget {
     required this.icon,
     required this.accent,
     required this.progress,
+    required this.onTap,
   });
 
   @override
@@ -711,77 +1168,189 @@ class _ExerciseCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final colors = _accentColors(colorScheme, accent);
 
-    return Card(
-      color: colorScheme.surface,
-      surfaceTintColor: colors.foreground,
-      elevation: 1,
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return InkWell(
+      borderRadius: BorderRadius.circular(24),
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  _TintIcon(
+                    icon: icon,
+                    background: colors.background,
+                    foreground: colors.foreground,
+                    size: 54,
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          subtitle,
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Icon(Icons.chevron_right, color: colors.foreground),
+                ],
+              ),
+              const SizedBox(height: 14),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 8,
+                  value: progress,
+                  color: colors.foreground,
+                  backgroundColor: colors.background,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  _MetaPill(
+                    icon: Icons.schedule,
+                    label: meta,
+                    background: colorScheme.surfaceContainerLow,
+                    foreground: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 8),
+                  _MetaPill(
+                    icon: Icons.flag_outlined,
+                    label: chip,
+                    background: colors.background,
+                    foreground: colors.foreground,
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ExerciseDetailPage extends StatelessWidget {
+  final Map exercise;
+
+  const _ExerciseDetailPage({required this.exercise});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final title = _localizedExerciseName(exercise);
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Row(
               children: [
                 _TintIcon(
-                  icon: icon,
-                  background: colors.background,
-                  foreground: colors.foreground,
-                  size: 54,
+                  icon: Icons.accessibility_new,
+                  background: colorScheme.primary,
+                  foreground: colorScheme.onPrimary,
+                  size: 58,
                 ),
                 const SizedBox(width: 14),
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: Theme.of(context).textTheme.titleMedium,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(color: colorScheme.onSurfaceVariant),
-                      ),
-                    ],
+                  child: Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w800,
+                        ),
                   ),
                 ),
-                IconButton(
-                  tooltip: LocaleKeys.Patient_Training_ViewExerciseTooltip.tr(),
-                  onPressed: () {},
-                  icon: Icon(Icons.chevron_right, color: colors.foreground),
-                ),
               ],
             ),
-            const SizedBox(height: 14),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(999),
-              child: LinearProgressIndicator(
-                minHeight: 8,
-                value: progress,
-                color: colors.foreground,
-                backgroundColor: colors.background,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                _MetaPill(
-                  icon: Icons.schedule,
-                  label: meta,
-                  background: colorScheme.surfaceContainerLow,
-                  foreground: colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 8),
-                _MetaPill(
-                  icon: Icons.flag_outlined,
-                  label: chip,
-                  background: colors.background,
-                  foreground: colors.foreground,
-                ),
-              ],
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 16),
+          _ExerciseDetailSection(
+            icon: Icons.info_outline,
+            title: LocaleKeys.Common_Description.tr(),
+            content: _localizedExerciseCopy(exercise, 'description'),
+            color: colorScheme.primary,
+          ),
+          _ExerciseDetailSection(
+            icon: Icons.format_list_numbered,
+            title: LocaleKeys.Common_Instructions.tr(),
+            content: _localizedExerciseCopy(exercise, 'instructions'),
+            color: colorScheme.tertiary,
+          ),
+          _ExerciseDetailSection(
+            icon: Icons.health_and_safety_outlined,
+            title: LocaleKeys.Common_Safety.tr(),
+            content: _localizedExerciseCopy(exercise, 'safety'),
+            color: colorScheme.error,
+          ),
+          const SizedBox(height: 8),
+          Text(LocaleKeys.Exercises_Disclaimer.tr(),
+              style: TextStyle(color: colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseDetailSection extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String content;
+  final Color color;
+
+  const _ExerciseDetailSection({
+    required this.icon,
+    required this.title,
+    required this.content,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: scheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            Icon(icon, color: color),
+            const SizedBox(width: 10),
+            Text(title, style: Theme.of(context).textTheme.titleMedium)
+          ]),
+          const SizedBox(height: 10),
+          Text(content),
+        ],
       ),
     );
   }
@@ -1051,9 +1620,12 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      color: colorScheme.surface,
-      surfaceTintColor: colorScheme.primary,
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -1294,10 +1866,12 @@ class _MenuTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      color: Colors.white,
-      elevation: 1,
-      shadowColor: colorScheme.primary.withValues(alpha: 0.08),
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
@@ -1381,10 +1955,16 @@ class _NotificationBlock extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final colors = _accentColors(colorScheme, item.tone);
 
-    return Card(
-      color: colorScheme.surface,
-      surfaceTintColor: colors.foreground,
-      elevation: item.unread ? 2 : 0,
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: item.unread
+              ? colors.foreground.withValues(alpha: 0.5)
+              : colorScheme.outlineVariant,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -1477,10 +2057,12 @@ class _LanguageTile extends StatelessWidget {
         ? LocaleKeys.Common_Vietnamese.tr()
         : LocaleKeys.Common_English.tr();
 
-    return Card(
-      color: Colors.white,
-      elevation: 1,
-      shadowColor: colorScheme.primary.withValues(alpha: 0.08),
+    return Container(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _showLanguagePicker(context),
@@ -1649,7 +2231,7 @@ class _ActionRow extends StatelessWidget {
       children: [
         Expanded(
           child: FilledButton.icon(
-            onPressed: () {},
+            onPressed: () => _showActionDialog(context, primaryLabel),
             icon: Icon(primaryIcon),
             label: Text(primaryLabel),
           ),
@@ -1657,12 +2239,27 @@ class _ActionRow extends StatelessWidget {
         const SizedBox(width: 12),
         Expanded(
           child: FilledButton.tonalIcon(
-            onPressed: () {},
+            onPressed: () => _showActionDialog(context, secondaryLabel),
             icon: Icon(secondaryIcon),
             label: Text(secondaryLabel),
           ),
         ),
       ],
+    );
+  }
+
+  void _showActionDialog(BuildContext context, String action) {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(action),
+        content: Text(LocaleKeys.Patient_Device_HeroSubtitle.tr()),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(LocaleKeys.Common_Ok.tr())),
+        ],
+      ),
     );
   }
 }

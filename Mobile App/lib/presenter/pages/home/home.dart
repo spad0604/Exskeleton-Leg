@@ -12,6 +12,7 @@ import 'package:flutter_starter/di.dart';
 import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/pages/home/home_cubit.dart';
 import 'package:flutter_starter/presenter/pages/patient/patient_placeholders.dart';
+import 'package:flutter_starter/presenter/navigation/navigation.dart';
 
 @RoutePage()
 class HomePage extends StatelessWidget implements AutoRouteWrapper {
@@ -388,7 +389,7 @@ class _StatusContainer extends StatelessWidget {
           ),
           IconButton(
             tooltip: LocaleKeys.Patient_Device_ViewDeviceTooltip.tr(),
-            onPressed: () {},
+            onPressed: () => context.router.push(const DeviceRoute()),
             icon: const Icon(Icons.chevron_right),
           ),
         ],
@@ -467,7 +468,7 @@ class _NextExerciseCard extends StatelessWidget {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: () {},
+                onPressed: () => context.router.push(const TrainingRoute()),
                 icon: const Icon(Icons.play_arrow),
                 label: Text(LocaleKeys.Patient_Home_StartExercise.tr()),
               ),
@@ -533,7 +534,7 @@ class _EmptyPlanCard extends StatelessWidget {
             Text(LocaleKeys.Patient_Home_NoExerciseSubtitle.tr()),
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
-              onPressed: () {},
+              onPressed: () => context.router.push(const TrainingRoute()),
               icon: const Icon(Icons.fitness_center),
               label: Text(LocaleKeys.Common_ViewExercises.tr()),
             ),
@@ -606,7 +607,11 @@ class _AlertPreview extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(child: Text(alert.title)),
           TextButton(
-            onPressed: () {},
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const PatientNotificationsPage(),
+              ),
+            ),
             child: Text(LocaleKeys.Common_View.tr()),
           ),
         ],

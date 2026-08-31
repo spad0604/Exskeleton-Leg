@@ -16,6 +16,12 @@
     "View": "View",
     "ViewExercises": "View exercises",
     "Notifications": "Notifications",
+    "Locale": "Language code",
+    "Timezone": "Time zone",
+    "Ok": "OK",
+    "Description": "Description",
+    "Instructions": "Instructions",
+    "Safety": "Safety",
     "Logout": "Log out",
     "LoggingOut": "Logging out",
     "Language": "Language",
@@ -26,6 +32,57 @@
     "ApproxMinutes": "About {} min",
     "SetsReps": "{} sets x {} reps",
     "ProviderComingSoon": "{} will be supported in the next version."
+  },
+  "Exercises": {
+    "Disclaimer": "Use only the exercises approved for you by your clinician. Stop if you feel pain, dizziness, or sudden weakness.",
+    "SitToStand": {
+      "Name": "Sit to stand",
+      "Description": "Builds functional leg strength for controlled transfers.",
+      "Instructions": "Sit near the front of a stable chair. Place both feet under your knees, lean forward, and stand slowly. Reach back and sit down with control.",
+      "Safety": "Keep the chair behind you and use the armrests or a stable support if needed. Do not rush or let the knees collapse inward."
+    },
+    "SupportedKneeRaise": {
+      "Name": "Supported knee raise",
+      "Description": "Trains hip flexion and weight shifting while standing.",
+      "Instructions": "Stand tall while holding a stable support. Slowly lift one knee, lower it, then repeat on the other side.",
+      "Safety": "Keep both hands or the prescribed support available. Keep your trunk upright and stop if balance becomes unsafe."
+    },
+    "SeatedKneeExtension": {
+      "Name": "Seated knee extension",
+      "Description": "Activates the quadriceps through a controlled seated movement.",
+      "Instructions": "Sit upright with both feet supported. Slowly straighten one knee, pause briefly, then lower the foot with control.",
+      "Safety": "Move only through the comfortable range prescribed by your clinician. Do not kick or lock the knee forcefully."
+    },
+    "HeelRaises": {
+      "Name": "Supported heel raises",
+      "Description": "Strengthens the calf muscles for standing and walking support.",
+      "Instructions": "Stand behind a stable chair or counter. Rise onto your toes slowly, pause, and lower both heels with control.",
+      "Safety": "Use the support throughout. Keep weight even and do not perform this exercise unsupported if balance is limited."
+    },
+    "StraightLegRaise": {
+      "Name": "Straight-leg raise",
+      "Description": "Builds front-thigh control without repeated knee bending.",
+      "Instructions": "Lie on your back with one knee bent and the other leg straight. Tighten the thigh, lift the straight leg slowly, then lower it.",
+      "Safety": "Keep the knee straight without forcing it. Stop if pain increases or the leg cannot be controlled."
+    },
+    "HeelSlides": {
+      "Name": "Heel slides",
+      "Description": "Gently practices knee bending and straightening in a supported position.",
+      "Instructions": "Lie on your back. Slide one heel toward your body to bend the knee, then slide it away slowly to straighten.",
+      "Safety": "Stay within the comfortable range and never force the knee into pain or a hard stop."
+    },
+    "QuadSet": {
+      "Name": "Static quadriceps set",
+      "Description": "Rebuilds the ability to activate the front-thigh muscles.",
+      "Instructions": "Lie or sit with the leg straight. Tighten the front of the thigh by gently pressing the knee down, hold briefly, and relax.",
+      "Safety": "Use a small, comfortable contraction. Do not hold your breath or press so hard that pain increases."
+    },
+    "SupportedHipExtension": {
+      "Name": "Supported hip extension",
+      "Description": "Strengthens the hip extensors while standing with support.",
+      "Instructions": "Hold a stable support with your trunk upright. Move one straight leg gently backward without arching your back, then return slowly.",
+      "Safety": "Keep the movement small and controlled. Do not lean forward or perform without support if balance is limited."
+    }
   },
   "Auth": {
     "Login": {
@@ -66,9 +123,13 @@
     "Training": {
       "Today": "Today",
       "All": "All",
-      "PendingTitle": "3 exercises pending",
+      "PendingTitle": "{} exercises pending",
       "PendingSubtitle": "Prioritize today's exercises and check the device before training.",
-      "ViewExerciseTooltip": "View exercise"
+      "ViewExerciseTooltip": "View exercise",
+      "Planned": "Planned",
+      "InProgress": "In progress",
+      "Completed": "Completed",
+      "Skipped": "Skipped"
     },
     "Progress": {
       "Week": "Week",
@@ -78,8 +139,8 @@
       "CorrectMoves": "Correct moves",
       "StreakDays": "Streak: {} days",
       "RecentHistory": "Recent history",
-      "HeroTitle": "This week is steadier",
-      "HeroSubtitle": "Completion is up 12% from last week.",
+      "HeroTitle": "{} of {} exercises completed",
+      "HeroSubtitle": "Your latest progress from the selected period.",
       "SessionSitStand": "Sit to stand",
       "SessionSitStandSubtitle": "Today - Completed 15 / 16 reps",
       "SessionHipExtension": "Slow hip extension",
@@ -98,7 +159,7 @@
       "Calibrate": "Calibrate",
       "Diagnostics": "Diagnostics",
       "HeroTitle": "Exoskeleton is connecting",
-      "HeroSubtitle": "Battery 78% - sensors ready",
+      "HeroSubtitle": "Battery {}% - {}",
       "ViewDeviceTooltip": "View device",
       "PairDeviceTitle": "No device paired",
       "PairDeviceMessage": "Pair a device to start assisted training.",
