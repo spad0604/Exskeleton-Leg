@@ -8,13 +8,15 @@ import java.io.IOException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.io.Resource;
 
 @Configuration
 public class FirebaseConfig {
     @Bean
+    @ConditionalOnProperty(name = "app.firebase.service-account")
     FirebaseApp firebaseApp(
-            @Value("${app.firebase.service-account:classpath:exskeleton-eg-d686d4077d8e.json}") Resource serviceAccount)
+            @Value("${app.firebase.service-account}") Resource serviceAccount)
             throws IOException {
         if (!FirebaseApp.getApps().isEmpty()) {
             return FirebaseApp.getInstance();
@@ -29,6 +31,7 @@ public class FirebaseConfig {
     }
 
     @Bean
+    @ConditionalOnProperty(name = "app.firebase.service-account")
     FirebaseMessaging firebaseMessaging(FirebaseApp firebaseApp) {
         return FirebaseMessaging.getInstance(firebaseApp);
     }

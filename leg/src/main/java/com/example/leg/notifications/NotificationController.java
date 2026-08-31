@@ -9,6 +9,7 @@ import jakarta.validation.constraints.NotBlank;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,8 +25,8 @@ public class NotificationController {
     private final FirebaseMessaging firebaseMessaging;
     private final PatientDataService patientData;
 
-    public NotificationController(FirebaseMessaging firebaseMessaging, PatientDataService patientData) {
-        this.firebaseMessaging = firebaseMessaging;
+    public NotificationController(ObjectProvider<FirebaseMessaging> firebaseMessaging, PatientDataService patientData) {
+        this.firebaseMessaging = firebaseMessaging.getIfAvailable();
         this.patientData = patientData;
     }
 
