@@ -1,5 +1,6 @@
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_starter/data/repositories/auth_repository/auth_repository.dart';
@@ -9,6 +10,7 @@ import 'package:flutter_starter/data/states/auth/auth_event.dart';
 import 'package:flutter_starter/data/sources/network/network.dart';
 import 'package:flutter_starter/di.dart';
 import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
+import 'package:flutter_starter/presenter/widgets/exo_kinematic_model.dart';
 import 'package:flutter_starter/services/cloudinary/cloudinary_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -325,10 +327,21 @@ class DevicePage extends StatelessWidget {
       load: () => provider.get<NetworkDataSource>().getDevices(patientId!),
       builder: (items) {
         if (items.isEmpty) {
-          return [Center(child: Text(LocaleKeys.Patient_Device_NoDevice.tr()))];
+          return [
+            const _DeviceModelCard(),
+            const SizedBox(height: 16),
+            _StatusBanner(
+              assetPath: 'assets/images/ic_fill_setting.png',
+              title: LocaleKeys.Patient_Device_NoDevice.tr(),
+              message: LocaleKeys.Patient_Device_PairDeviceMessage.tr(),
+              tone: _StatusTone.info,
+            ),
+          ];
         }
         final device = items.first;
         return [
+          const _DeviceModelCard(),
+          const SizedBox(height: 16),
           _DeviceHero(
             model: '${device['model'] ?? ''}',
             battery: (device['battery_percent'] as num?)?.toInt() ?? 0,
@@ -1034,6 +1047,103 @@ class _DeviceHero extends StatelessWidget {
                   style: TextStyle(color: colorScheme.onPrimaryContainer),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DeviceModelCard extends StatelessWidget {
+  const _DeviceModelCard();
+
+  bool get _supports3dView =>
+      kIsWeb ||
+      defaultTargetPlatform == TargetPlatform.android ||
+      defaultTargetPlatform == TargetPlatform.iOS;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primaryContainer,
+            colorScheme.surfaceContainerLowest,
+            colorScheme.secondaryContainer.withValues(alpha: 0.72),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: colorScheme.primary.withValues(alpha: 0.12),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 8),
+            child: Row(
+              children: [
+                _TintIcon(
+                  icon: Icons.view_in_ar_outlined,
+                  background: colorScheme.primary,
+                  foreground: colorScheme.onPrimary,
+                  size: 42,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    LocaleKeys.Patient_Device_ModelTitle.tr(),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          color: colorScheme.onPrimaryContainer,
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                ),
+                Icon(Icons.touch_app_outlined,
+                    color: colorScheme.primary.withValues(alpha: 0.8)),
+              ],
+            ),
+          ),
+          SizedBox(
+            height: 380,
+            width: double.infinity,
+            child: _supports3dView
+                ? Semantics(
+                    label: LocaleKeys.Patient_Device_PairedModel.tr(),
+                    child: const ExoKinematicModel(),
+                  )
+                : Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        LocaleKeys.Patient_Device_ModelUnavailable.tr(),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: colorScheme.onPrimaryContainer),
+                      ),
+                    ),
+                  ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 2, 18, 18),
+            child: Text(
+              LocaleKeys.Patient_Device_ModelSubtitle.tr(),
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color:
+                        colorScheme.onPrimaryContainer.withValues(alpha: 0.78),
+                  ),
             ),
           ),
         ],

@@ -35,17 +35,17 @@ android {
         dev {
             dimension "flavor-type"
             applicationId "com.flutter.nextai.dev"
-            resValue "string", "app_name", "[Dev] NextAi"
+            resValue "string", "app_name", "[Dev] Exoskeleton Leg"
         }
         staging {
             dimension "flavor-type"
             applicationId "com.flutter.nextai.stg"
-            resValue "string", "app_name", "[Stg] NextAi"
+            resValue "string", "app_name", "[Stg] Exoskeleton Leg"
         }
         production {
             dimension "flavor-type"
             applicationId "com.flutter.nextai"
-            resValue "string", "app_name", "NextAi"
+            resValue "string", "app_name", "Exoskeleton Leg"
         }
     }
 
