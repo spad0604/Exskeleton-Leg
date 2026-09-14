@@ -58,6 +58,11 @@ dependencies:
   # Storage
   flutter_secure_storage: ^9.2.4
 
+  # BLE central (mobile app connects to the Raspberry Pi GATT peripheral).
+  # 5.4.x preserves the project's existing Retrofit/protobuf dependency graph.
+  flutter_reactive_ble: ^5.4.1
+  permission_handler: ^12.0.3
+
   # Media
   image_picker: ^1.1.2
   # Pinned because ExoKinematicModel uses this release's internal Three.js scene.
@@ -103,6 +108,7 @@ flutter:
     - assets/files/
     - assets/fonts/
     - assets/images/
+    - assets/images/gen_assets/
     - lib/presenter/languages/translations/
   #   - images/a_dot_burr.jpeg
   #   - images/a_dot_ham.jpeg

@@ -54,5 +54,7 @@
       <string>en</string>
       <string>vi</string>
     </array>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>Bluetooth is used to prepare and monitor your exercise device.</string>
   </dict>
 </plist>

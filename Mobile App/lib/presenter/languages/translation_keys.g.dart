@@ -36,6 +36,48 @@ abstract class LocaleKeys {
   static const Common_ProviderComingSoon = 'Common.ProviderComingSoon';
   static const Common = 'Common';
   static const Exercises_Disclaimer = 'Exercises.Disclaimer';
+  static const Exercises_Walk_Name = 'Exercises.Walk.Name';
+  static const Exercises_Walk_Description = 'Exercises.Walk.Description';
+  static const Exercises_Walk_Instructions = 'Exercises.Walk.Instructions';
+  static const Exercises_Walk_Safety = 'Exercises.Walk.Safety';
+  static const Exercises_RaiseLeftLeg_Name = 'Exercises.RaiseLeftLeg.Name';
+  static const Exercises_RaiseLeftLeg_Description =
+      'Exercises.RaiseLeftLeg.Description';
+  static const Exercises_RaiseLeftLeg_Instructions =
+      'Exercises.RaiseLeftLeg.Instructions';
+  static const Exercises_RaiseLeftLeg_Safety = 'Exercises.RaiseLeftLeg.Safety';
+  static const Exercises_RaiseRightLeg_Name = 'Exercises.RaiseRightLeg.Name';
+  static const Exercises_RaiseRightLeg_Description =
+      'Exercises.RaiseRightLeg.Description';
+  static const Exercises_RaiseRightLeg_Instructions =
+      'Exercises.RaiseRightLeg.Instructions';
+  static const Exercises_RaiseRightLeg_Safety =
+      'Exercises.RaiseRightLeg.Safety';
+  static const Exercises_KickLeftLeg_Name = 'Exercises.KickLeftLeg.Name';
+  static const Exercises_KickLeftLeg_Description =
+      'Exercises.KickLeftLeg.Description';
+  static const Exercises_KickLeftLeg_Instructions =
+      'Exercises.KickLeftLeg.Instructions';
+  static const Exercises_KickLeftLeg_Safety = 'Exercises.KickLeftLeg.Safety';
+  static const Exercises_KickRightLeg_Name = 'Exercises.KickRightLeg.Name';
+  static const Exercises_KickRightLeg_Description =
+      'Exercises.KickRightLeg.Description';
+  static const Exercises_KickRightLeg_Instructions =
+      'Exercises.KickRightLeg.Instructions';
+  static const Exercises_KickRightLeg_Safety = 'Exercises.KickRightLeg.Safety';
+  static const Exercises_KickLeftKnee_Name = 'Exercises.KickLeftKnee.Name';
+  static const Exercises_KickLeftKnee_Description =
+      'Exercises.KickLeftKnee.Description';
+  static const Exercises_KickLeftKnee_Instructions =
+      'Exercises.KickLeftKnee.Instructions';
+  static const Exercises_KickLeftKnee_Safety = 'Exercises.KickLeftKnee.Safety';
+  static const Exercises_KickRightKnee_Name = 'Exercises.KickRightKnee.Name';
+  static const Exercises_KickRightKnee_Description =
+      'Exercises.KickRightKnee.Description';
+  static const Exercises_KickRightKnee_Instructions =
+      'Exercises.KickRightKnee.Instructions';
+  static const Exercises_KickRightKnee_Safety =
+      'Exercises.KickRightKnee.Safety';
   static const Exercises_SitToStand_Name = 'Exercises.SitToStand.Name';
   static const Exercises_SitToStand_Description =
       'Exercises.SitToStand.Description';

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
@@ -13,6 +15,8 @@ import 'package:flutter_starter/presenter/languages/translation_keys.g.dart';
 import 'package:flutter_starter/presenter/widgets/exo_kinematic_model.dart';
 import 'package:flutter_starter/services/cloudinary/cloudinary_upload_service.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:flutter_starter/services/ble/exo_ble_service.dart';
+import 'package:flutter_starter/services/ble/exo_ble_protocol.dart';
 
 @RoutePage()
 class TrainingPage extends StatelessWidget {
@@ -87,6 +91,8 @@ class _PlanListViewState extends State<_PlanListView> {
               const SizedBox(height: 16),
               for (final item in items) ...[
                 _ExerciseCard(
+                  assetPath:
+                      '${(item['exercise'] as Map)['image_asset'] ?? ''}',
                   title: _localizedExerciseName(item['exercise'] as Map),
                   subtitle: LocaleKeys.Common_SetsReps.tr(
                     args: [
@@ -108,7 +114,7 @@ class _PlanListViewState extends State<_PlanListView> {
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => _ExerciseDetailPage(
-                        exercise: item['exercise'] as Map,
+                        planItem: item,
                       ),
                     ),
                   ),
@@ -173,6 +179,45 @@ String _localizedExerciseCopy(Map exercise, String field) {
       LocaleKeys.Exercises_SupportedHipExtension_Instructions,
     'supported_hip_extension:safety' =>
       LocaleKeys.Exercises_SupportedHipExtension_Safety,
+    'walk:name' => LocaleKeys.Exercises_Walk_Name,
+    'walk:description' => LocaleKeys.Exercises_Walk_Description,
+    'walk:instructions' => LocaleKeys.Exercises_Walk_Instructions,
+    'walk:safety' => LocaleKeys.Exercises_Walk_Safety,
+    'raise_left_leg:name' => LocaleKeys.Exercises_RaiseLeftLeg_Name,
+    'raise_left_leg:description' =>
+      LocaleKeys.Exercises_RaiseLeftLeg_Description,
+    'raise_left_leg:instructions' =>
+      LocaleKeys.Exercises_RaiseLeftLeg_Instructions,
+    'raise_left_leg:safety' => LocaleKeys.Exercises_RaiseLeftLeg_Safety,
+    'raise_right_leg:name' => LocaleKeys.Exercises_RaiseRightLeg_Name,
+    'raise_right_leg:description' =>
+      LocaleKeys.Exercises_RaiseRightLeg_Description,
+    'raise_right_leg:instructions' =>
+      LocaleKeys.Exercises_RaiseRightLeg_Instructions,
+    'raise_right_leg:safety' => LocaleKeys.Exercises_RaiseRightLeg_Safety,
+    'kick_left_leg:name' => LocaleKeys.Exercises_KickLeftLeg_Name,
+    'kick_left_leg:description' => LocaleKeys.Exercises_KickLeftLeg_Description,
+    'kick_left_leg:instructions' =>
+      LocaleKeys.Exercises_KickLeftLeg_Instructions,
+    'kick_left_leg:safety' => LocaleKeys.Exercises_KickLeftLeg_Safety,
+    'kick_right_leg:name' => LocaleKeys.Exercises_KickRightLeg_Name,
+    'kick_right_leg:description' =>
+      LocaleKeys.Exercises_KickRightLeg_Description,
+    'kick_right_leg:instructions' =>
+      LocaleKeys.Exercises_KickRightLeg_Instructions,
+    'kick_right_leg:safety' => LocaleKeys.Exercises_KickRightLeg_Safety,
+    'kick_left_knee:name' => LocaleKeys.Exercises_KickLeftKnee_Name,
+    'kick_left_knee:description' =>
+      LocaleKeys.Exercises_KickLeftKnee_Description,
+    'kick_left_knee:instructions' =>
+      LocaleKeys.Exercises_KickLeftKnee_Instructions,
+    'kick_left_knee:safety' => LocaleKeys.Exercises_KickLeftKnee_Safety,
+    'kick_right_knee:name' => LocaleKeys.Exercises_KickRightKnee_Name,
+    'kick_right_knee:description' =>
+      LocaleKeys.Exercises_KickRightKnee_Description,
+    'kick_right_knee:instructions' =>
+      LocaleKeys.Exercises_KickRightKnee_Instructions,
+    'kick_right_knee:safety' => LocaleKeys.Exercises_KickRightKnee_Safety,
     _ => null,
   };
   final fallbackField = field == 'name' ? 'name' : '${field}_key';
@@ -263,7 +308,8 @@ class _ProgressViewState extends State<_ProgressView> {
                         label: LocaleKeys.Patient_Progress_Completed.tr(),
                         value:
                             '${data['completed_count']} / ${data['planned_count']}',
-                        assetPath: 'assets/images/ic_calendar.png',
+                        assetPath:
+                            'assets/images/gen_assets/asset_calendar.png',
                         accent: _AccentTone.primary,
                       ),
                     ),
@@ -274,7 +320,7 @@ class _ProgressViewState extends State<_ProgressView> {
                         value: LocaleKeys.Common_Minutes.tr(args: [
                           '${((data['active_seconds'] as num) / 60).round()}',
                         ]),
-                        assetPath: 'assets/images/ic_clock.png',
+                        assetPath: 'assets/images/gen_assets/asset_clock.png',
                         accent: _AccentTone.tertiary,
                       ),
                     ),
@@ -285,7 +331,7 @@ class _ProgressViewState extends State<_ProgressView> {
                   label: LocaleKeys.Patient_Progress_CorrectMoves.tr(),
                   value:
                       '${((data['correctness_ratio'] as num) * 100).round()}%',
-                  assetPath: 'assets/images/ic_heart_circle.png',
+                  assetPath: 'assets/images/gen_assets/asset_progress.png',
                   accent: _AccentTone.neutral,
                 ),
                 const SizedBox(height: 24),
@@ -320,72 +366,160 @@ class DevicePage extends StatelessWidget {
   const DevicePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final patientId = context.read<AuthBloc>().state.account?.id;
-    return _PatientApiView<List<Map<String, dynamic>>>(
-      title: LocaleKeys.Patient_Tabs_Device.tr(),
-      load: () => provider.get<NetworkDataSource>().getDevices(patientId!),
-      builder: (items) {
-        if (items.isEmpty) {
-          return [
-            const _DeviceModelCard(),
-            const SizedBox(height: 16),
-            _StatusBanner(
-              assetPath: 'assets/images/ic_fill_setting.png',
-              title: LocaleKeys.Patient_Device_NoDevice.tr(),
-              message: LocaleKeys.Patient_Device_PairDeviceMessage.tr(),
-              tone: _StatusTone.info,
-            ),
-          ];
-        }
-        final device = items.first;
-        return [
-          const _DeviceModelCard(),
+  Widget build(BuildContext context) => _PatientTabScaffold(
+        title: LocaleKeys.Patient_Tabs_Device.tr(),
+        children: [
+          const _LiveDeviceStatusCard(),
           const SizedBox(height: 16),
-          _DeviceHero(
-            model: '${device['model'] ?? ''}',
-            battery: (device['battery_percent'] as num?)?.toInt() ?? 0,
-            ready: (device['readiness'] as Map?)?['state'] == 'ready',
-          ),
+          const _DeviceModelCard(),
           const SizedBox(height: 16),
           _StatusBanner(
             assetPath: 'assets/images/ic_fill_setting.png',
-            title: (device['readiness'] as Map)['state'] == 'ready'
-                ? LocaleKeys.Patient_Device_Ready.tr()
-                : LocaleKeys.Patient_Device_NeedsCheck.tr(),
-            message: LocaleKeys.Patient_Device_Battery.tr(args: [
-              '${device['serial_number']}',
-              '${device['battery_percent']}',
+            title: LocaleKeys.Patient_Device_NoDevice.tr(),
+            message:
+                'Kết nối Pi qua Bluetooth để xem trạng thái thiết bị trực tiếp.',
+            tone: _StatusTone.info,
+          ),
+        ],
+      );
+}
+
+class _LiveDeviceStatusCard extends StatefulWidget {
+  const _LiveDeviceStatusCard();
+
+  @override
+  State<_LiveDeviceStatusCard> createState() => _LiveDeviceStatusCardState();
+}
+
+class _LiveDeviceStatusCardState extends State<_LiveDeviceStatusCard> {
+  final _ble = ExoBleService.shared;
+  StreamSubscription<LiveDeviceStatus>? _subscription;
+  LiveDeviceStatus? _liveStatus;
+  String _connectionText = 'Chưa chọn Pi qua Bluetooth';
+  bool _scanning = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription = _ble.deviceStatus.listen((status) {
+      if (mounted) {
+        setState(() {
+          _liveStatus = status;
+          _connectionText = 'Đã kết nối Pi qua Bluetooth';
+        });
+      }
+    }, onError: (Object error) {
+      if (mounted) setState(() => _connectionText = 'Lỗi Bluetooth: $error');
+    });
+  }
+
+  Future<void> _chooseDevice() async {
+    setState(() => _scanning = true);
+    try {
+      final devices = await _ble.discoverExoskeletons();
+      if (!mounted) return;
+      final selected = await showDialog<ExoBleDevice>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Chọn thiết bị chân'),
+          content: devices.isEmpty
+              ? const Text('Không tìm thấy ExoLeg đang quảng bá gần đây.')
+              : SizedBox(
+                  width: double.maxFinite,
+                  child: ListView(
+                    shrinkWrap: true,
+                    children: [
+                      for (final device in devices)
+                        ListTile(
+                          leading: Image.asset(
+                            'assets/images/gen_assets/asset_bluetooth.png',
+                            width: 32,
+                            height: 32,
+                            fit: BoxFit.cover,
+                          ),
+                          title: Text(device.name),
+                          subtitle: Text('Tín hiệu ${device.rssi} dBm'),
+                          onTap: () => Navigator.of(context).pop(device),
+                        ),
+                    ],
+                  ),
+                ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Đóng'),
+            ),
+          ],
+        ),
+      );
+      if (selected == null) return;
+      await _ble.connect(deviceId: selected.id);
+      if (mounted) {
+        setState(
+            () => _connectionText = 'Đã kết nối, đang chờ trạng thái từ Pi…');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _connectionText = 'Chưa kết nối Pi: $error');
+    } finally {
+      if (mounted) setState(() => _scanning = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final status = _liveStatus;
+    final battery = status == null || status.batteryPercent < 0
+        ? 'Chưa có dữ liệu BMS'
+        : '${status.batteryPercent.round()}%';
+    return Card(
+      color: scheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Image.asset(
+                'assets/images/gen_assets/asset_bluetooth.png',
+                width: 28,
+                height: 28,
+                fit: BoxFit.cover,
+              ),
+              const SizedBox(width: 8),
+              Text('Trạng thái Pi trực tiếp',
+                  style: Theme.of(context).textTheme.titleMedium),
             ]),
-            tone: _StatusTone.ready,
-          ),
-          const SizedBox(height: 16),
-          _InfoTile(
-            assetPath: 'assets/images/ic_fill_setting.png',
-            title: device['model'] as String,
-            subtitle: LocaleKeys.Patient_Device_Firmware.tr(args: [
-              '${device['firmware_version']}',
-            ]),
-          ),
-          _InfoTile(
-            assetPath: 'assets/images/ic_heart_circle.png',
-            title: LocaleKeys.Patient_Device_SensorsStable.tr(),
-            subtitle: LocaleKeys.Patient_Device_SensorsStableSubtitle.tr(),
-          ),
-          _InfoTile(
-            assetPath: 'assets/images/ic_clock.png',
-            title: LocaleKeys.Patient_Device_CalibrationValid.tr(),
-            subtitle: LocaleKeys.Patient_Device_CalibrationExpiry.tr(),
-          ),
-          const SizedBox(height: 16),
-          _ActionRow(
-            primaryLabel: LocaleKeys.Patient_Device_Calibrate.tr(),
-            secondaryLabel: LocaleKeys.Patient_Device_Diagnostics.tr(),
-            primaryIcon: Icons.straighten,
-            secondaryIcon: Icons.fact_check_outlined,
-          ),
-        ];
-      },
+            const SizedBox(height: 10),
+            Text(_connectionText),
+            if (status != null) ...[
+              const SizedBox(height: 8),
+              Text('Trạng thái: ${status.state}'),
+              Text('Pin BMS: $battery'),
+              Text(
+                  'E-stop: ${status.estopActive ? 'ĐANG KÍCH HOẠT' : 'không kích hoạt'}'),
+              if (status.faultReason?.isNotEmpty == true)
+                Text(status.faultReason!,
+                    style: TextStyle(color: scheme.error)),
+            ],
+            if (status == null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _scanning ? null : _chooseDevice,
+                icon: const Icon(Icons.refresh),
+                label:
+                    Text(_scanning ? 'Đang quét…' : 'Chọn thiết bị Bluetooth'),
+              ),
+            ],
+          ],
+        ),
+      ),
     );
   }
 }
@@ -780,12 +914,14 @@ class _ProfilePageState extends State<ProfilePage> {
               value: account?.roles.join(', ') ??
                   LocaleKeys.Patient_Profile_PatientAccount.tr(),
               icon: Icons.badge_outlined,
+              assetPath: 'assets/images/gen_assets/asset_calendar.png',
               accent: _AccentTone.primary,
             ),
             _ProfileInfoItem(
               label: LocaleKeys.Patient_Profile_Status.tr(),
               value: LocaleKeys.Patient_Profile_Active.tr(),
               icon: Icons.verified_user_outlined,
+              assetPath: 'assets/images/gen_assets/asset_clock.png',
               accent: _AccentTone.secondary,
             ),
           ],
@@ -795,13 +931,14 @@ class _ProfilePageState extends State<ProfilePage> {
           title: LocaleKeys.Patient_Profile_AccountSection.tr(),
           children: [
             _MenuTile(
-              assetPath: 'assets/images/ic_indentity.png',
+              assetPath: 'assets/images/gen_assets/asset_profile.png',
               label: LocaleKeys.Patient_Profile_PersonalProfile.tr(),
               subtitle: LocaleKeys.Patient_Profile_PersonalProfileSubtitle.tr(),
               onTap: () => _openAccountDetails(context, account),
             ),
+            const SizedBox(height: 10),
             _MenuTile(
-              assetPath: 'assets/images/ic_phone.png',
+              assetPath: 'assets/images/gen_assets/asset_phone.png',
               label: LocaleKeys.Patient_Profile_CareNetwork.tr(),
               subtitle: LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
               onTap: () => _openProfileInfo(
@@ -816,7 +953,7 @@ class _ProfilePageState extends State<ProfilePage> {
           title: LocaleKeys.Patient_Profile_SettingsSection.tr(),
           children: [
             _MenuTile(
-              assetPath: 'assets/images/ic_fill_bell.png',
+              assetPath: 'assets/images/gen_assets/asset_notifications.png',
               label: LocaleKeys.Patient_Profile_Notifications.tr(),
               subtitle: LocaleKeys.Patient_Profile_NotificationsSubtitle.tr(),
               onTap: () => Navigator.of(context).push(
@@ -825,9 +962,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 ),
               ),
             ),
+            const SizedBox(height: 10),
             const _LanguageTile(),
+            const SizedBox(height: 10),
             _MenuTile(
-              assetPath: 'assets/images/ic_heart_circle.png',
+              assetPath: 'assets/images/gen_assets/asset_exercise_rehab.png',
               label: LocaleKeys.Patient_Profile_Accessibility.tr(),
               subtitle: LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr(),
               onTap: () => _openProfileInfo(
@@ -835,8 +974,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   LocaleKeys.Patient_Profile_Accessibility.tr(),
                   LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr()),
             ),
+            const SizedBox(height: 10),
             _MenuTile(
-              assetPath: 'assets/images/ic_fill_indentity.png',
+              assetPath: 'assets/images/gen_assets/asset_privacy.png',
               label: LocaleKeys.Patient_Profile_Privacy.tr(),
               subtitle: LocaleKeys.Patient_Profile_PrivacySubtitle.tr(),
               onTap: () => _openProfileInfo(
@@ -844,8 +984,9 @@ class _ProfilePageState extends State<ProfilePage> {
                   LocaleKeys.Patient_Profile_Privacy.tr(),
                   LocaleKeys.Patient_Profile_PrivacySubtitle.tr()),
             ),
+            const SizedBox(height: 10),
             _MenuTile(
-              assetPath: 'assets/images/ic_fill_help.png',
+              assetPath: 'assets/images/gen_assets/asset_help.png',
               label: LocaleKeys.Patient_Profile_Help.tr(),
               subtitle: LocaleKeys.Patient_Profile_HelpSubtitle.tr(),
               onTap: () => _openProfileInfo(
@@ -906,11 +1047,14 @@ class _TrainingHero extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _TintIcon(
-            icon: Icons.fitness_center,
-            background: colorScheme.primary,
-            foreground: colorScheme.onPrimary,
-            size: 58,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/images/gen_assets/asset_training_plan.png',
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -958,11 +1102,14 @@ class _ProgressHero extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _TintIcon(
-            icon: Icons.trending_up,
-            background: colorScheme.tertiary,
-            foreground: colorScheme.onTertiary,
-            size: 58,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(18),
+            child: Image.asset(
+              'assets/images/gen_assets/asset_progress.png',
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -992,6 +1139,8 @@ class _ProgressHero extends StatelessWidget {
   }
 }
 
+// Retained for the future server-profile view; live BLE data is shown instead.
+// ignore: unused_element
 class _DeviceHero extends StatelessWidget {
   final String model;
   final int battery;
@@ -1253,6 +1402,7 @@ class _SegmentHeaderState extends State<_SegmentHeader> {
 }
 
 class _ExerciseCard extends StatelessWidget {
+  final String assetPath;
   final String title;
   final String subtitle;
   final String meta;
@@ -1263,6 +1413,7 @@ class _ExerciseCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const _ExerciseCard({
+    required this.assetPath,
     required this.title,
     required this.subtitle,
     required this.meta,
@@ -1294,12 +1445,18 @@ class _ExerciseCard extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  _TintIcon(
-                    icon: icon,
-                    background: colors.background,
-                    foreground: colors.foreground,
-                    size: 54,
-                  ),
+                  assetPath.isEmpty
+                      ? _TintIcon(
+                          icon: icon,
+                          background: colors.background,
+                          foreground: colors.foreground,
+                          size: 54,
+                        )
+                      : ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(assetPath,
+                              width: 54, height: 54, fit: BoxFit.cover),
+                        ),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Column(
@@ -1356,14 +1513,63 @@ class _ExerciseCard extends StatelessWidget {
   }
 }
 
-class _ExerciseDetailPage extends StatelessWidget {
-  final Map exercise;
+class _ExerciseDetailPage extends StatefulWidget {
+  final Map planItem;
 
-  const _ExerciseDetailPage({required this.exercise});
+  const _ExerciseDetailPage({required this.planItem});
+
+  @override
+  State<_ExerciseDetailPage> createState() => _ExerciseDetailPageState();
+}
+
+class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
+  final _ble = ExoBleService.shared;
+  String _deviceStatus = 'Chưa kết nối thiết bị';
+  bool _preparing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _ble.status.listen((status) {
+      if (mounted) {
+        setState(() => _deviceStatus = status.reason?.isNotEmpty == true
+            ? '${status.state}: ${status.reason}'
+            : status.state);
+      }
+    });
+  }
+
+  Future<void> _prepare() async {
+    final target = widget.planItem['target'] as Map? ?? const {};
+    final exercise = widget.planItem['exercise'] as Map;
+    setState(() => _preparing = true);
+    try {
+      await _ble.prepareExercise(
+        sessionId: '${widget.planItem['session_id'] ?? widget.planItem['id']}',
+        planItemId: '${widget.planItem['id']}',
+        exerciseCode: '${exercise['code']}',
+        sets: (target['sets'] as num?)?.toInt() ?? 0,
+        repetitions: (target['repetitions_per_set'] as num?)?.toInt() ?? 0,
+      );
+      if (mounted) {
+        setState(() => _deviceStatus = 'Đã gửi yêu cầu chuẩn bị bài tập');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _deviceStatus = 'Không thể chuẩn bị: $error');
+    } finally {
+      if (mounted) setState(() => _preparing = false);
+    }
+  }
+
+  @override
+  void dispose() {
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final exercise = widget.planItem['exercise'] as Map;
     final title = _localizedExerciseName(exercise);
     return Scaffold(
       appBar: AppBar(title: Text(title)),
@@ -1379,10 +1585,9 @@ class _ExerciseDetailPage extends StatelessWidget {
             ),
             child: Row(
               children: [
-                _TintIcon(
-                  icon: Icons.accessibility_new,
-                  background: colorScheme.primary,
-                  foreground: colorScheme.onPrimary,
+                _ExerciseAsset(
+                  assetPath: '${exercise['image_asset'] ?? ''}',
+                  fallback: Icons.accessibility_new,
                   size: 58,
                 ),
                 const SizedBox(width: 14),
@@ -1417,6 +1622,19 @@ class _ExerciseDetailPage extends StatelessWidget {
             content: _localizedExerciseCopy(exercise, 'safety'),
             color: colorScheme.error,
           ),
+          const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _preparing ? null : _prepare,
+            icon: _preparing
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.bluetooth_connected),
+            label: const Text('Chuẩn bị bài tập trên thiết bị'),
+          ),
+          const SizedBox(height: 8),
+          Text('Trạng thái thiết bị: $_deviceStatus',
+              style: TextStyle(color: colorScheme.onSurfaceVariant)),
           const SizedBox(height: 8),
           Text(LocaleKeys.Exercises_Disclaimer.tr(),
               style: TextStyle(color: colorScheme.onSurfaceVariant)),
@@ -1489,6 +1707,36 @@ class _TintIcon extends StatelessWidget {
         borderRadius: BorderRadius.circular(size * 0.34),
       ),
       child: Icon(icon, color: foreground, size: size * 0.54),
+    );
+  }
+}
+
+class _ExerciseAsset extends StatelessWidget {
+  final String assetPath;
+  final IconData fallback;
+  final double size;
+
+  const _ExerciseAsset({
+    required this.assetPath,
+    required this.fallback,
+    required this.size,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    if (assetPath.isEmpty) {
+      return _TintIcon(
+        icon: fallback,
+        background: scheme.primary,
+        foreground: scheme.onPrimary,
+        size: size,
+      );
+    }
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * .28),
+      child:
+          Image.asset(assetPath, width: size, height: size, fit: BoxFit.cover),
     );
   }
 }
@@ -1629,12 +1877,14 @@ class _MetricCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _AssetTintIcon(
-            assetPath: assetPath,
-            background: colors.foreground.withValues(alpha: 0.12),
-            foreground: colors.foreground,
-            size: 42,
-            iconSize: 23,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(14),
+            child: Image.asset(
+              assetPath,
+              width: 42,
+              height: 42,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(height: 12),
           Text(
@@ -1715,6 +1965,7 @@ class _StatusBanner extends StatelessWidget {
 
 enum _StatusTone { ready, info }
 
+// ignore: unused_element
 class _InfoTile extends StatelessWidget {
   final String assetPath;
   final String title;
@@ -1897,7 +2148,14 @@ class _ProfileInfoCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(item.icon, color: colors.foreground),
+          item.assetPath == null
+              ? Icon(item.icon, color: colors.foreground)
+              : Image.asset(
+                  item.assetPath!,
+                  width: 32,
+                  height: 32,
+                  fit: BoxFit.contain,
+                ),
           const SizedBox(height: 10),
           Text(
             item.value,
@@ -1925,12 +2183,14 @@ class _ProfileInfoItem {
   final String label;
   final String value;
   final IconData icon;
+  final String? assetPath;
   final _AccentTone accent;
 
   const _ProfileInfoItem({
     required this.label,
     required this.value,
     required this.icon,
+    this.assetPath,
     required this.accent,
   });
 }
@@ -1985,12 +2245,14 @@ class _MenuTile extends StatelessWidget {
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-        leading: _AssetTintIcon(
-          assetPath: assetPath,
-          background: colorScheme.secondaryContainer,
-          foreground: colorScheme.secondary,
-          size: 54,
-          iconSize: 29,
+        leading: ClipRRect(
+          borderRadius: BorderRadius.circular(16),
+          child: Image.asset(
+            assetPath,
+            width: 54,
+            height: 54,
+            fit: BoxFit.cover,
+          ),
         ),
         title: Text(
           label,
@@ -2021,11 +2283,14 @@ class _NotificationSummary extends StatelessWidget {
       ),
       child: Row(
         children: [
-          _TintIcon(
-            icon: Icons.notifications_active_outlined,
-            background: colorScheme.secondary,
-            foreground: colorScheme.onSecondary,
-            size: 58,
+          ClipRRect(
+            borderRadius: BorderRadius.circular(19),
+            child: Image.asset(
+              'assets/images/gen_assets/asset_notifications.png',
+              width: 58,
+              height: 58,
+              fit: BoxFit.cover,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -2180,11 +2445,14 @@ class _LanguageTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           child: Row(
             children: [
-              _TintIcon(
-                icon: Icons.translate,
-                background: colorScheme.tertiaryContainer,
-                foreground: colorScheme.tertiary,
-                size: 54,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Image.asset(
+                  'assets/images/gen_assets/asset_language.png',
+                  width: 54,
+                  height: 54,
+                  fit: BoxFit.cover,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -2322,6 +2590,7 @@ class _LanguageOption extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 class _ActionRow extends StatelessWidget {
   final String primaryLabel;
   final String secondaryLabel;

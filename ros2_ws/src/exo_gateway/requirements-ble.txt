@@ -1,0 +1,3 @@
+# Installed on the Raspberry Pi system / ROS virtual environment, not by rosdep.
+bless==0.3.0
+pyserial==3.5

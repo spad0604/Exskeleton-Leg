@@ -82,7 +82,14 @@
       "Description": "Strengthens the hip extensors while standing with support.",
       "Instructions": "Hold a stable support with your trunk upright. Move one straight leg gently backward without arching your back, then return slowly.",
       "Safety": "Keep the movement small and controlled. Do not lean forward or perform without support if balance is limited."
-    }
+    },
+    "Walk": {"Name":"Walking","Description":"Practices steady, controlled walking with the exoskeleton.","Instructions":"Stand tall with the prescribed support. Take slow, even steps and keep your gaze forward.","Safety":"Use supervision and support as prescribed. Stop if you feel pain, dizziness, or loss of balance."},
+    "RaiseLeftLeg": {"Name":"Raise left leg","Description":"Builds controlled lifting strength in the left leg.","Instructions":"Hold a stable support, lift the left leg slowly, pause, and lower it with control.","Safety":"Keep your trunk upright and avoid swinging. Stop if balance or pain worsens."},
+    "RaiseRightLeg": {"Name":"Raise right leg","Description":"Builds controlled lifting strength in the right leg.","Instructions":"Hold a stable support, lift the right leg slowly, pause, and lower it with control.","Safety":"Keep your trunk upright and avoid swinging. Stop if balance or pain worsens."},
+    "KickLeftLeg": {"Name":"Kick left leg","Description":"Practices a controlled forward movement of the left leg.","Instructions":"Hold support, extend the left leg gently forward, then return slowly.","Safety":"Use a small range and never snap the knee. Keep support within reach."},
+    "KickRightLeg": {"Name":"Kick right leg","Description":"Practices a controlled forward movement of the right leg.","Instructions":"Hold support, extend the right leg gently forward, then return slowly.","Safety":"Use a small range and never snap the knee. Keep support within reach."},
+    "KickLeftKnee": {"Name":"Kick left knee","Description":"Practices controlled left knee lifting and extension.","Instructions":"Hold support, lift the left knee as prescribed, extend gently, and return slowly.","Safety":"Do not force the range or lock the knee. Stop if pain or instability appears."},
+    "KickRightKnee": {"Name":"Kick right knee","Description":"Practices controlled right knee lifting and extension.","Instructions":"Hold support, lift the right knee as prescribed, extend gently, and return slowly.","Safety":"Do not force the range or lock the knee. Stop if pain or instability appears."}
   },
   "Auth": {
     "Login": {

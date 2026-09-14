@@ -82,7 +82,14 @@
       "Description": "Tăng sức mạnh cơ duỗi hông khi đứng có hỗ trợ.",
       "Instructions": "Vịn vào điểm tựa chắc chắn, giữ thân thẳng. Đưa một chân duỗi nhẹ ra sau không ưỡn lưng rồi trở về chậm.",
       "Safety": "Giữ biên độ nhỏ và có kiểm soát. Không nghiêng người về trước hoặc tập không hỗ trợ nếu thăng bằng hạn chế."
-    }
+    },
+    "Walk": {"Name":"Đi bộ","Description":"Luyện đi bộ đều và có kiểm soát cùng bộ khung trợ lực.","Instructions":"Đứng thẳng với điểm tựa theo chỉ định. Bước chậm, đều và nhìn về phía trước.","Safety":"Tập với giám sát và hỗ trợ theo chỉ định. Dừng lại nếu đau, chóng mặt hoặc mất thăng bằng."},
+    "RaiseLeftLeg": {"Name":"Nâng chân trái","Description":"Tăng sức mạnh nâng chân trái có kiểm soát.","Instructions":"Vịn vào điểm tựa chắc chắn, từ từ nâng chân trái, giữ ngắn rồi hạ xuống.","Safety":"Giữ thân thẳng và không vung chân. Dừng lại nếu thăng bằng kém hoặc đau tăng."},
+    "RaiseRightLeg": {"Name":"Nâng chân phải","Description":"Tăng sức mạnh nâng chân phải có kiểm soát.","Instructions":"Vịn vào điểm tựa chắc chắn, từ từ nâng chân phải, giữ ngắn rồi hạ xuống.","Safety":"Giữ thân thẳng và không vung chân. Dừng lại nếu thăng bằng kém hoặc đau tăng."},
+    "KickLeftLeg": {"Name":"Đá chân trái","Description":"Luyện đưa chân trái về trước có kiểm soát.","Instructions":"Vịn điểm tựa, nhẹ nhàng duỗi chân trái ra trước rồi từ từ trở về.","Safety":"Dùng biên độ nhỏ và không giật mạnh đầu gối. Luôn để điểm tựa trong tầm với."},
+    "KickRightLeg": {"Name":"Đá chân phải","Description":"Luyện đưa chân phải về trước có kiểm soát.","Instructions":"Vịn điểm tựa, nhẹ nhàng duỗi chân phải ra trước rồi từ từ trở về.","Safety":"Dùng biên độ nhỏ và không giật mạnh đầu gối. Luôn để điểm tựa trong tầm với."},
+    "KickLeftKnee": {"Name":"Đá đầu gối trái","Description":"Luyện nâng và duỗi đầu gối trái có kiểm soát.","Instructions":"Vịn điểm tựa, nâng đầu gối trái theo chỉ định, nhẹ nhàng duỗi rồi trở về chậm.","Safety":"Không ép biên độ hoặc khóa gối. Dừng lại nếu đau hoặc mất ổn định."},
+    "KickRightKnee": {"Name":"Đá đầu gối phải","Description":"Luyện nâng và duỗi đầu gối phải có kiểm soát.","Instructions":"Vịn điểm tựa, nâng đầu gối phải theo chỉ định, nhẹ nhàng duỗi rồi trở về chậm.","Safety":"Không ép biên độ hoặc khóa gối. Dừng lại nếu đau hoặc mất ổn định."}
   },
   "Auth": {
     "Login": {

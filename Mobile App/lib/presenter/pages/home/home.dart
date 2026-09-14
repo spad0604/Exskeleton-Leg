@@ -45,7 +45,11 @@ class HomePage extends StatelessWidget implements AutoRouteWrapper {
       appBar: AppBar(
         backgroundColor: Colors.white,
         surfaceTintColor: Colors.transparent,
-        title: Text(LocaleKeys.Patient_Tabs_Today.tr()),
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text(LocaleKeys.Patient_Tabs_Today.tr()),
+        ),
         actions: [
           IconButton(
             tooltip: LocaleKeys.Common_Notifications.tr(),
@@ -54,7 +58,12 @@ class HomePage extends StatelessWidget implements AutoRouteWrapper {
                 builder: (_) => const PatientNotificationsPage(),
               ),
             ),
-            icon: const Icon(Icons.notifications_outlined),
+            icon: Image.asset(
+              'assets/images/gen_assets/asset_notifications.png',
+              width: 26,
+              height: 26,
+              fit: BoxFit.cover,
+            ),
           ),
           BlocConsumer<LogoutCubit, LogoutStatus>(
             listener: (context, status) {
@@ -104,7 +113,6 @@ class _HomeContent extends StatelessWidget {
     }
 
     final nextPlanItem = data.nextPlanItem;
-    final device = data.device;
     final metrics = data.todayMetrics;
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -113,7 +121,7 @@ class _HomeContent extends StatelessWidget {
       children: [
         _HomeHero(displayName: data.patient.displayName),
         const SizedBox(height: 20),
-        _HomeStatusBanner(device: device),
+        const _HomeStatusBanner(),
         const SizedBox(height: 20),
         if (nextPlanItem == null)
           const _EmptyPlanCard()
@@ -198,10 +206,14 @@ class _HomeHero extends StatelessWidget {
               color: colorScheme.primary,
               borderRadius: BorderRadius.circular(18),
             ),
-            child: Icon(
-              Icons.accessibility_new,
-              color: colorScheme.onPrimary,
-              size: 32,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(18),
+              child: Image.asset(
+                'assets/images/gen_assets/asset_profile.png',
+                width: 56,
+                height: 56,
+                fit: BoxFit.cover,
+              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -303,46 +315,26 @@ class _HomeError extends StatelessWidget {
 }
 
 class _HomeStatusBanner extends StatelessWidget {
-  final HomeDevice? device;
-
-  const _HomeStatusBanner({required this.device});
+  const _HomeStatusBanner();
 
   @override
   Widget build(BuildContext context) {
-    final currentDevice = device;
-    if (currentDevice == null) {
-      return _StatusContainer(
-        icon: Icons.settings_remote_outlined,
-        foreground: Theme.of(context).colorScheme.primary,
-        background: Theme.of(context).colorScheme.primaryContainer,
-        title: LocaleKeys.Patient_Device_PairDeviceTitle.tr(),
-        message: LocaleKeys.Patient_Device_PairDeviceMessage.tr(),
-      );
-    }
-
-    final ready =
-        currentDevice.readiness.state == 'ready' && currentDevice.online;
     final colorScheme = Theme.of(context).colorScheme;
     return _StatusContainer(
-      icon: ready ? Icons.check_circle : Icons.cloud_off,
-      foreground: ready ? colorScheme.secondary : const Color(0xFF5E5E65),
-      background:
-          ready ? colorScheme.secondaryContainer : const Color(0xFFE5E1E6),
-      title: ready
-          ? LocaleKeys.Patient_Device_Ready.tr()
-          : LocaleKeys.Patient_Device_NotReady.tr(),
-      message: LocaleKeys.Patient_Device_Battery.tr(
-        args: [
-          currentDevice.serialNumber,
-          '${currentDevice.batteryPercent}',
-        ],
-      ),
+      icon: Icons.bluetooth_searching,
+      assetPath: 'assets/images/gen_assets/asset_bluetooth.png',
+      foreground: colorScheme.primary,
+      background: colorScheme.primaryContainer,
+      title: 'Trạng thái thiết bị chưa được kết nối',
+      message:
+          'Mở tab Thiết bị và kết nối Pi qua Bluetooth để xem dữ liệu trực tiếp.',
     );
   }
 }
 
 class _StatusContainer extends StatelessWidget {
   final IconData icon;
+  final String? assetPath;
   final Color foreground;
   final Color background;
   final String title;
@@ -350,6 +342,7 @@ class _StatusContainer extends StatelessWidget {
 
   const _StatusContainer({
     required this.icon,
+    this.assetPath,
     required this.foreground,
     required this.background,
     required this.title,
@@ -374,7 +367,13 @@ class _StatusContainer extends StatelessWidget {
               color: foreground.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: Icon(icon, color: foreground, size: 30),
+            child: assetPath == null
+                ? Icon(icon, color: foreground, size: 30)
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.asset(assetPath!,
+                        width: 48, height: 48, fit: BoxFit.cover),
+                  ),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -535,7 +534,12 @@ class _EmptyPlanCard extends StatelessWidget {
             const SizedBox(height: 16),
             FilledButton.tonalIcon(
               onPressed: () => context.router.push(const TrainingRoute()),
-              icon: const Icon(Icons.fitness_center),
+              icon: Image.asset(
+                'assets/images/gen_assets/asset_exercises.png',
+                width: 24,
+                height: 24,
+                fit: BoxFit.cover,
+              ),
               label: Text(LocaleKeys.Common_ViewExercises.tr()),
             ),
           ],

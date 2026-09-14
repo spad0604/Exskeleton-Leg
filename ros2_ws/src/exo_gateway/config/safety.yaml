@@ -1,0 +1,13 @@
+safety_gateway:
+  ros__parameters:
+    max_assist_percent: 40.0
+    command_timeout_sec: 0.5
+    # Development-safe default: stays armed-off until hardware adapter exists.
+    estop_active: true
+
+uart_bridge:
+  ros__parameters:
+    # GPIO UART on Raspberry Pi 4B after dtoverlay=miniuart-bt.
+    device: /dev/serial0
+    baudrate: 115200
+    reconnect_sec: 2.0

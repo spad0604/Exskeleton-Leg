@@ -68,6 +68,12 @@ Pi/ros_ws/.catkin_tools/
 Pi/ros_ws/src/**/__pycache__/
 Pi/ros_ws/src/**/*.pyc
 
+# ROS 2 / colcon
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+ros2_ws/.venv/
+
 # Python
 __pycache__/
 *.py[cod]
