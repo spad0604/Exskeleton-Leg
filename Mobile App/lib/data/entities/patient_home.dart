@@ -101,7 +101,9 @@ class Readiness {
 class NextPlanItem {
   final String id;
   final String exerciseId;
+  final String exerciseCode;
   final String exerciseName;
+  final String imageAsset;
   final ExerciseTarget target;
   final String assistanceLevel;
   final int estimatedDurationSeconds;
@@ -109,7 +111,9 @@ class NextPlanItem {
   const NextPlanItem({
     required this.id,
     required this.exerciseId,
+    required this.exerciseCode,
     required this.exerciseName,
+    required this.imageAsset,
     required this.target,
     required this.assistanceLevel,
     required this.estimatedDurationSeconds,
@@ -118,7 +122,9 @@ class NextPlanItem {
   factory NextPlanItem.fromJson(Map<String, dynamic> json) => NextPlanItem(
         id: json['id'] as String,
         exerciseId: json['exercise_id'] as String,
+        exerciseCode: json['exercise_code'] as String? ?? '',
         exerciseName: json['exercise_name'] as String,
+        imageAsset: json['image_asset'] as String? ?? '',
         target: ExerciseTarget.fromJson(
           json['target'] as Map<String, dynamic>,
         ),

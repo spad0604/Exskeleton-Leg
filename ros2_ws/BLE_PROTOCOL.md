@@ -8,7 +8,7 @@ Pi exposes one service:
 
 | Characteristic | UUID suffix | Direction | Purpose |
 | --- | --- | --- | --- |
-| Exoskeleton service | `6e400001-b5a3-f393-e0a9-e50e24dcca9e` | — | GATT service |
+| Exoskeleton service | `6e400101-b5a3-f393-e0a9-e50e24dcca9e` | — | GATT service, schema v2 |
 | Control | `...0002-b5a3-f393-e0a9-e50e24dcca9e` | app → Pi, write with response | Request preparation |
 | Status | `...0003-b5a3-f393-e0a9-e50e24dcca9e` | Pi → app, notification | Exercise readiness/status |
 

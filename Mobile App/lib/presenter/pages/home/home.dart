@@ -132,6 +132,7 @@ class _HomeContent extends StatelessWidget {
           children: [
             Expanded(
               child: _TodayMetric(
+                assetPath: 'assets/images/gen_assets/asset_exercises.png',
                 icon: Icons.task_alt,
                 value: '${metrics.completedCount} / ${metrics.plannedCount}',
                 label: LocaleKeys.Patient_Home_CompletedExercises.tr(),
@@ -142,6 +143,7 @@ class _HomeContent extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: _TodayMetric(
+                assetPath: 'assets/images/gen_assets/asset_clock.png',
                 icon: Icons.timer_outlined,
                 value: _minutesLabel(metrics.activeSeconds),
                 label: LocaleKeys.Patient_Home_TrainingTime.tr(),
@@ -153,6 +155,7 @@ class _HomeContent extends StatelessWidget {
         ),
         const SizedBox(height: 12),
         _TodayMetric(
+          assetPath: 'assets/images/gen_assets/asset_progress.png',
           icon: Icons.check_circle_outline,
           value: _ratioLabel(metrics.correctnessRatio),
           label: LocaleKeys.Patient_Home_CorrectMoves.tr(),
@@ -422,10 +425,11 @@ class _NextExerciseCard extends StatelessWidget {
                     color: colorScheme.secondaryContainer,
                     borderRadius: BorderRadius.circular(18),
                   ),
-                  child: Icon(
-                    Icons.accessibility_new,
-                    color: colorScheme.onSecondaryContainer,
-                    size: 32,
+                  child: _HomeAsset(
+                    assetPath: planItem.imageAsset.isNotEmpty
+                        ? planItem.imageAsset
+                        : 'assets/images/gen_assets/asset_exercises.png',
+                    size: 52,
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -492,6 +496,22 @@ class _NextExerciseCard extends StatelessWidget {
   }
 }
 
+class _HomeAsset extends StatelessWidget {
+  final String assetPath;
+  final double size;
+
+  const _HomeAsset({required this.assetPath, required this.size});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(size * .28),
+      child:
+          Image.asset(assetPath, width: size, height: size, fit: BoxFit.cover),
+    );
+  }
+}
+
 class _PlanChip extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -550,6 +570,7 @@ class _EmptyPlanCard extends StatelessWidget {
 }
 
 class _TodayMetric extends StatelessWidget {
+  final String? assetPath;
   final IconData icon;
   final String value;
   final String label;
@@ -557,6 +578,7 @@ class _TodayMetric extends StatelessWidget {
   final Color foreground;
 
   const _TodayMetric({
+    this.assetPath,
     required this.icon,
     required this.value,
     required this.label,
@@ -575,7 +597,10 @@ class _TodayMetric extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: foreground),
+          assetPath == null
+              ? Icon(icon, color: foreground)
+              : Image.asset(assetPath!,
+                  width: 30, height: 30, fit: BoxFit.contain),
           const SizedBox(height: 12),
           Text(
             value,
@@ -607,7 +632,12 @@ class _AlertPreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber, color: Color(0xFF765A00)),
+          Image.asset(
+            'assets/images/gen_assets/asset_notifications.png',
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+          ),
           const SizedBox(width: 12),
           Expanded(child: Text(alert.title)),
           TextButton(
@@ -638,7 +668,12 @@ class _NoAlertPreview extends StatelessWidget {
       ),
       child: Row(
         children: [
-          const Icon(Icons.check_circle_outline),
+          Image.asset(
+            'assets/images/gen_assets/asset_progress.png',
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+          ),
           const SizedBox(width: 12),
           Expanded(child: Text(LocaleKeys.Patient_Home_NoAlerts.tr())),
         ],

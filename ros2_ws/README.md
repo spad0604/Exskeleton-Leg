@@ -7,12 +7,13 @@ tới motor controller.
 ## Kiến trúc kết nối
 
 ```
-Flutter app -- BLE (pairing + lệnh cấp cao) --> Pi BLE bridge --> /exo/command/request
+Flutter app -- BLE (lệnh cấp cao) --> Pi BLE bridge --> /exo/exercise/request
+ESP32 buttons/OLED -- UART1/UART2 --> Pi UART bridge --> ROS2 safety gateway
 Backend ---- HTTPS/MQTT (profile, plan, log) -------> Pi cloud sync
-                                                     Pi safety gateway --> motor controller
+                                                     safety gate --> actuator adapter
 ```
 
-App không gửi torque, PWM, tốc độ hoặc góc motor. BLE chỉ mang các ý định mức cao
+App và ESP32 không gửi torque, PWM, tốc độ hoặc góc motor. BLE/UART chỉ mang các ý định mức cao
 như `start`, `pause`, `stop`, và `set_assist_percent`; Pi kiểm tra trạng thái cảm
 biến, profile đã được phê duyệt, công tắc E-stop, giới hạn cơ khí và watchdog trước
 khi phát lệnh. Server không nằm trong đường điều khiển thời gian thực: mất Internet
@@ -85,6 +86,33 @@ thiết bị khác, đổi `device` trong
 `src/exo_gateway/config/safety.yaml`. Không nối trực tiếp mức điện áp 5 V vào
 ESP32; xác nhận pin UART và mức 3.3 V trên đúng board.
 
+Chuẩn UART cố định: 115200 baud, 8 data bits, no parity, 1 stop bit (8N1),
+Pi TX nối ESP32 RX2 GPIO16, Pi RX nối ESP32 TX2 GPIO17, và chung GND. Trên
+ESP32 đây là HardwareSerial(2). Trên Pi, device /dev/serial0 là UART GPIO
+sau overlay hiện tại; không dùng /dev/serial1 nếu nó đang dành cho Bluetooth.
+
+ESP32 gửi định kỳ device_status gồm battery_voltage, battery_percent,
+estop_active, command_watchdog_ok, fault_reason; Pi chuyển tiếp các trường
+này qua BLE để Mobile đọc. Mạch đo pin phải là 56 kOhm phía pin và 10 kOhm
+xuống GND, không đưa điện áp pin trực tiếp vào ESP32.
+
+### Kiểm tra flow chọn bài và trạng thái
+
+Điện thoại chọn bài theo chuỗi:
+
+Mobile prepare_exercise -> BLE Pi -> /exo/exercise/prepare -> SafetyGateway
+lưu session -> Mobile exercise_command(start) -> /exo/exercise/request ->
+/exo/exercise/accepted -> UART Pi -> ESP32 UART2.
+
+ESP32 xác nhận bằng exercise_status; UART bridge đưa lên
+/exo/exercise/status; BLE bridge đưa tiếp cho Mobile. Khi bấm GPIO13/GPIO4,
+ESP32 phát exercise_selected; Pi chuyển event này thành
+exercise_status(selected) để Mobile nhận được.
+
+Nếu estop_active=true hoặc session chưa prepare, SafetyGateway cố ý không phát
+lệnh start xuống ESP32 và Mobile sẽ nhận not_ready/rejected. Đây là đường đi
+đúng và hiện tại motor chưa được phép chạy.
+
 ### Đọc log ROS và Bluetooth
 
 Mở terminal SSH thứ hai. Trên host Pi, log BLE của BlueZ:
@@ -111,7 +139,7 @@ và `UART RX`. Nếu thấy `UART unavailable`, kiểm tra:
 
 ```bash
 ls -l /dev/serial1 /dev/ttyAMA* /dev/ttyS* 2>/dev/null
-sudo fuser -v /dev/serial1
+sudo fuser -v /dev/serial0
 ```
 
 Nếu chỉ muốn test ROS + UART khi Bluetooth chưa cấu hình xong:
@@ -165,7 +193,7 @@ sudo systemctl enable --now bluetooth
 ```
 
 Thiết bị quảng bá tên `ExoLeg-1`. BLE service UUID là
-`6e400001-b5a3-f393-e0a9-e50e24dcca9e`. Control characteristic
+`6e400101-b5a3-f393-e0a9-e50e24dcca9e` (GATT schema v2). Control characteristic
 chỉ nhận JSON UTF-8 protocol v1 `prepare_exercise`; status characteristic là notify.
 Chi tiết UUID, payload và các status có tại [BLE_PROTOCOL.md](BLE_PROTOCOL.md).
 Sau khi production pairing/bonding được chốt, BlueZ phải whitelist bonded central trước
@@ -182,3 +210,13 @@ ros2 topic pub --once /exo/command/request exo_interfaces/msg/DeviceCommand \
 `exo_gateway` hiện chỉ publish lệnh đã được kiểm tra tới `/exo/command/accepted`.
 Thay publisher này bằng driver CAN/UART thực tế chỉ sau khi hoàn tất safety review,
 test HIL và fail-safe độc lập ở motor controller.
+
+### Dataset và luồng nút ESP32
+
+Tám mã bài tập được dùng thống nhất ở database, Mobile, BLE, ROS2 và firmware:
+`walk`, `raise_left_leg`, `raise_right_leg`, `sit_to_stand`, `kick_left_leg`,
+`kick_right_leg`, `kick_left_knee`, `kick_right_knee`. GPIO13/GPIO4 phát
+`exercise_selected` qua UART; GPIO2 phát yêu cầu start/stop. `SafetyGateway`
+kiểm tra mã bài, phía trái/phải, số lần, assist và E-stop trước khi phát
+`exercise_command` xuống ESP32. Chỉ cần bổ sung actuator adapter sau lớp này để
+ánh xạ từng `exercise_code` vào profile encoder/giới hạn cơ khí/PWM.

@@ -2,9 +2,11 @@ import 'dart:convert';
 
 /// Stable GATT UUIDs. Change only with an explicit protocol-version migration.
 abstract final class ExoBleProtocol {
-  static const serviceUuid = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
-  static const controlUuid = '6e400002-b5a3-f393-e0a9-e50e24dcca9e';
-  static const statusUuid = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
+  // GATT schema v2. The UUID namespace changed to invalidate Android's stale
+  // service cache from the earlier encrypted/bonding experiments.
+  static const serviceUuid = '6e400101-b5a3-f393-e0a9-e50e24dcca9e';
+  static const controlUuid = '6e400102-b5a3-f393-e0a9-e50e24dcca9e';
+  static const statusUuid = '6e400103-b5a3-f393-e0a9-e50e24dcca9e';
   static const protocolVersion = 1;
 
   static List<int> encode(Map<String, Object?> value) =>
@@ -13,12 +15,14 @@ abstract final class ExoBleProtocol {
 
 class ExerciseDeviceStatus {
   final String state;
+  final String? exerciseCode;
   final String? sessionId;
   final String? reason;
   final int? completedRepetitions;
 
   const ExerciseDeviceStatus({
     required this.state,
+    this.exerciseCode,
     this.sessionId,
     this.reason,
     this.completedRepetitions,
@@ -27,6 +31,7 @@ class ExerciseDeviceStatus {
   factory ExerciseDeviceStatus.fromJson(Map<String, dynamic> json) =>
       ExerciseDeviceStatus(
         state: json['state'] as String,
+        exerciseCode: json['exercise_code'] as String?,
         sessionId: json['session_id'] as String?,
         reason: json['reason'] as String?,
         completedRepetitions: (json['completed_repetitions'] as num?)?.toInt(),
@@ -36,6 +41,7 @@ class ExerciseDeviceStatus {
 class LiveDeviceStatus {
   final String state;
   final double batteryPercent;
+  final double batteryVoltage;
   final bool estopActive;
   final bool commandWatchdogOk;
   final String? faultReason;
@@ -43,6 +49,7 @@ class LiveDeviceStatus {
   const LiveDeviceStatus({
     required this.state,
     required this.batteryPercent,
+    required this.batteryVoltage,
     required this.estopActive,
     required this.commandWatchdogOk,
     this.faultReason,
@@ -52,6 +59,7 @@ class LiveDeviceStatus {
       LiveDeviceStatus(
         state: json['state'] as String,
         batteryPercent: (json['battery_percent'] as num).toDouble(),
+        batteryVoltage: (json['battery_voltage'] as num?)?.toDouble() ?? -1.0,
         estopActive: json['estop_active'] as bool,
         commandWatchdogOk: json['command_watchdog_ok'] as bool,
         faultReason: json['fault_reason'] as String?,

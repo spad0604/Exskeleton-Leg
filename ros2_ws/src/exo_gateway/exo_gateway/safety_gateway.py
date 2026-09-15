@@ -33,17 +33,29 @@ class SafetyGateway(Node):
         self._exercise_status_pub = self.create_publisher(ExerciseStatus, '/exo/exercise/status', 10)
         self.create_timer(0.1, self._publish_state)
 
-        self._known_exercises = {
-            'walk', 'raise_left_leg', 'raise_right_leg', 'sit_to_stand',
-            'kick_left_leg', 'kick_right_leg', 'kick_left_knee', 'kick_right_knee',
+        # Single source of truth for the commissioning dataset. The actuator
+        # adapter will later use the same code to select its motion profile.
+        self._exercise_catalog = {
+            'walk': {'side': ExerciseCommand.SIDE_BOTH, 'profile': 'gait'},
+            'raise_left_leg': {'side': ExerciseCommand.SIDE_LEFT, 'profile': 'leg_raise'},
+            'raise_right_leg': {'side': ExerciseCommand.SIDE_RIGHT, 'profile': 'leg_raise'},
+            'sit_to_stand': {'side': ExerciseCommand.SIDE_BOTH, 'profile': 'sit_stand'},
+            'kick_left_leg': {'side': ExerciseCommand.SIDE_LEFT, 'profile': 'leg_kick'},
+            'kick_right_leg': {'side': ExerciseCommand.SIDE_RIGHT, 'profile': 'leg_kick'},
+            'kick_left_knee': {'side': ExerciseCommand.SIDE_LEFT, 'profile': 'knee_kick'},
+            'kick_right_knee': {'side': ExerciseCommand.SIDE_RIGHT, 'profile': 'knee_kick'},
         }
 
     def _on_prepare_exercise(self, exercise):
         status = ExerciseStatus()
         status.session_id = exercise.session_id
+        status.exercise_code = exercise.exercise_code
         if self._estop_active():
             status.state = 'not_ready'
             status.reason = 'E-stop active or hardware adapter not configured'
+        elif exercise.exercise_code not in self._exercise_catalog:
+            status.state = 'rejected'
+            status.reason = 'unsupported exercise code'
         elif not exercise.exercise_code or not exercise.sets or not exercise.repetitions:
             status.state = 'rejected'
             status.reason = 'exercise code, sets, and repetitions are required'
@@ -56,6 +68,7 @@ class SafetyGateway(Node):
     def _on_exercise_request(self, command):
         status = ExerciseStatus()
         status.session_id = command.session_id
+        status.exercise_code = command.exercise_code
         status.completed_repetitions = 0
 
         if command.action == ExerciseCommand.ACTION_STOP:
@@ -67,9 +80,13 @@ class SafetyGateway(Node):
         if self._estop_active():
             status.state = 'not_ready'
             status.reason = 'E-stop active or hardware adapter not configured'
-        elif command.exercise_code not in self._known_exercises:
+        elif command.exercise_code not in self._exercise_catalog:
             status.state = 'rejected'
             status.reason = 'unsupported exercise code'
+        elif (self._exercise_catalog[command.exercise_code]['side'] != ExerciseCommand.SIDE_BOTH
+              and command.side != self._exercise_catalog[command.exercise_code]['side']):
+            status.state = 'rejected'
+            status.reason = 'exercise side does not match the selected profile'
         elif not self._prepared_session_id or command.session_id != self._prepared_session_id:
             status.state = 'rejected'
             status.reason = 'exercise session was not prepared'
@@ -124,6 +141,7 @@ class SafetyGateway(Node):
         )
         state.state = DeviceState.STATE_FAULT if state.estop_active else DeviceState.STATE_READY
         state.battery_percent = -1.0  # replaced by BMS adapter
+        state.battery_voltage = -1.0  # replaced by ESP32 ADC/BMS telemetry
         state.fault_reason = self._fault_reason
         self._state_pub.publish(state)
 

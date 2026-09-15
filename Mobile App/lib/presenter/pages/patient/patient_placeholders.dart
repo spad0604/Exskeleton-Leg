@@ -455,8 +455,7 @@ class _LiveDeviceStatusCardState extends State<_LiveDeviceStatusCard> {
       if (selected == null) return;
       await _ble.connect(deviceId: selected.id);
       if (mounted) {
-        setState(
-            () => _connectionText = 'Đã kết nối, đang chờ trạng thái từ Pi…');
+        setState(() => _connectionText = 'Đã kết nối Pi qua Bluetooth');
       }
     } catch (error) {
       if (mounted) setState(() => _connectionText = 'Chưa kết nối Pi: $error');
@@ -508,7 +507,7 @@ class _LiveDeviceStatusCardState extends State<_LiveDeviceStatusCard> {
                 Text(status.faultReason!,
                     style: TextStyle(color: scheme.error)),
             ],
-            if (status == null) ...[
+            if (status == null && !_ble.isConnected) ...[
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _scanning ? null : _chooseDevice,
@@ -662,10 +661,19 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-void _openProfileInfo(BuildContext context, String title, String subtitle) {
+void _openProfileInfo(
+  BuildContext context,
+  String title,
+  String subtitle,
+  String assetPath,
+) {
   Navigator.of(context).push(
     MaterialPageRoute<void>(
-      builder: (_) => _ProfileInfoPage(title: title, subtitle: subtitle),
+      builder: (_) => _ProfileInfoPage(
+        title: title,
+        subtitle: subtitle,
+        assetPath: assetPath,
+      ),
     ),
   );
 }
@@ -673,8 +681,13 @@ void _openProfileInfo(BuildContext context, String title, String subtitle) {
 class _ProfileInfoPage extends StatelessWidget {
   final String title;
   final String subtitle;
+  final String assetPath;
 
-  const _ProfileInfoPage({required this.title, required this.subtitle});
+  const _ProfileInfoPage({
+    required this.title,
+    required this.subtitle,
+    required this.assetPath,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -698,11 +711,14 @@ class _ProfileInfoPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                CircleAvatar(
-                  radius: 28,
-                  backgroundColor: scheme.primary,
-                  child: Icon(Icons.person_outline,
-                      color: scheme.onPrimary, size: 30),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(20),
+                  child: Image.asset(
+                    assetPath,
+                    width: 56,
+                    height: 56,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 const SizedBox(height: 18),
                 Text(title,
@@ -720,11 +736,14 @@ class _ProfileInfoPage extends StatelessWidget {
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
               child: ListTile(
-                leading: _TintIcon(
-                  icon: Icons.info_outline,
-                  background: scheme.tertiaryContainer,
-                  foreground: scheme.tertiary,
-                  size: 48,
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    assetPath,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  ),
                 ),
                 title: Text(title),
                 subtitle: Text(subtitle),
@@ -764,15 +783,14 @@ class _AccountDetailsPage extends StatelessWidget {
                 color: scheme.primaryContainer,
                 borderRadius: BorderRadius.circular(28)),
             child: Row(children: [
-              CircleAvatar(
-                  radius: 34,
-                  backgroundColor: scheme.primary,
-                  child: Text(
-                      account.displayName.characters.first.toUpperCase(),
-                      style: TextStyle(
-                          color: scheme.onPrimary,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w800))),
+              ClipRRect(
+                  borderRadius: BorderRadius.circular(22),
+                  child: Image.asset(
+                    'assets/images/gen_assets/asset_profile.png',
+                    width: 68,
+                    height: 68,
+                    fit: BoxFit.cover,
+                  )),
               const SizedBox(width: 16),
               Expanded(
                   child: Column(
@@ -791,26 +809,31 @@ class _AccountDetailsPage extends StatelessWidget {
           const SizedBox(height: 16),
           _AccountField(
               icon: Icons.badge_outlined,
+              assetPath: 'assets/images/gen_assets/asset_profile.png',
               label: LocaleKeys.Patient_Profile_Role.tr(),
               value: account.roles.join(', '),
               accent: _AccentTone.primary),
           _AccountField(
               icon: Icons.email_outlined,
+              assetPath: 'assets/images/gen_assets/asset_phone.png',
               label: LocaleKeys.Common_Email.tr(),
               value: account.email ?? '—',
               accent: _AccentTone.secondary),
           _AccountField(
               icon: Icons.language_outlined,
+              assetPath: 'assets/images/gen_assets/asset_language.png',
               label: LocaleKeys.Common_Locale.tr(),
               value: account.locale ?? '—',
               accent: _AccentTone.tertiary),
           _AccountField(
               icon: Icons.schedule_outlined,
+              assetPath: 'assets/images/gen_assets/asset_clock.png',
               label: LocaleKeys.Common_Timezone.tr(),
               value: account.timezone ?? '—',
               accent: _AccentTone.neutral),
           _AccountField(
               icon: Icons.verified_user_outlined,
+              assetPath: 'assets/images/gen_assets/asset_privacy.png',
               label: LocaleKeys.Patient_Profile_Status.tr(),
               value: LocaleKeys.Patient_Profile_Active.tr(),
               accent: _AccentTone.secondary),
@@ -822,11 +845,13 @@ class _AccountDetailsPage extends StatelessWidget {
 
 class _AccountField extends StatelessWidget {
   final IconData icon;
+  final String? assetPath;
   final String label;
   final String value;
   final _AccentTone accent;
   const _AccountField(
       {required this.icon,
+      this.assetPath,
       required this.label,
       required this.value,
       required this.accent});
@@ -844,11 +869,21 @@ class _AccountField extends StatelessWidget {
         ),
       ),
       child: ListTile(
-        leading: _TintIcon(
-            icon: icon,
-            background: colors.background,
-            foreground: colors.foreground,
-            size: 48),
+        leading: assetPath == null
+            ? _TintIcon(
+                icon: icon,
+                background: colors.background,
+                foreground: colors.foreground,
+                size: 48)
+            : ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Image.asset(
+                  assetPath!,
+                  width: 48,
+                  height: 48,
+                  fit: BoxFit.cover,
+                ),
+              ),
         title: Text(label),
         subtitle: Text(value),
       ),
@@ -944,7 +979,8 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => _openProfileInfo(
                   context,
                   LocaleKeys.Patient_Profile_CareNetwork.tr(),
-                  LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr()),
+                  LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
+                  'assets/images/gen_assets/asset_phone.png'),
             ),
           ],
         ),
@@ -972,7 +1008,8 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => _openProfileInfo(
                   context,
                   LocaleKeys.Patient_Profile_Accessibility.tr(),
-                  LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr()),
+                  LocaleKeys.Patient_Profile_AccessibilitySubtitle.tr(),
+                  'assets/images/gen_assets/asset_exercise_rehab.png'),
             ),
             const SizedBox(height: 10),
             _MenuTile(
@@ -982,7 +1019,8 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => _openProfileInfo(
                   context,
                   LocaleKeys.Patient_Profile_Privacy.tr(),
-                  LocaleKeys.Patient_Profile_PrivacySubtitle.tr()),
+                  LocaleKeys.Patient_Profile_PrivacySubtitle.tr(),
+                  'assets/images/gen_assets/asset_privacy.png'),
             ),
             const SizedBox(height: 10),
             _MenuTile(
@@ -992,7 +1030,8 @@ class _ProfilePageState extends State<ProfilePage> {
               onTap: () => _openProfileInfo(
                   context,
                   LocaleKeys.Patient_Profile_Help.tr(),
-                  LocaleKeys.Patient_Profile_HelpSubtitle.tr()),
+                  LocaleKeys.Patient_Profile_HelpSubtitle.tr(),
+                  'assets/images/gen_assets/asset_help.png'),
             ),
           ],
         ),
@@ -1488,7 +1527,9 @@ class _ExerciseCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 12),
-              Row(
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
                 children: [
                   _MetaPill(
                     icon: Icons.schedule,
@@ -1496,7 +1537,6 @@ class _ExerciseCard extends StatelessWidget {
                     background: colorScheme.surfaceContainerLow,
                     foreground: colorScheme.onSurfaceVariant,
                   ),
-                  const SizedBox(width: 8),
                   _MetaPill(
                     icon: Icons.flag_outlined,
                     label: chip,
@@ -1526,11 +1566,15 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
   final _ble = ExoBleService.shared;
   String _deviceStatus = 'Chưa kết nối thiết bị';
   bool _preparing = false;
+  StreamSubscription<ExerciseDeviceStatus>? _statusSubscription;
 
   @override
   void initState() {
     super.initState();
-    _ble.status.listen((status) {
+    if (_ble.isConnected) {
+      _deviceStatus = 'Đã kết nối Pi qua Bluetooth';
+    }
+    _statusSubscription = _ble.status.listen((status) {
       if (mounted) {
         setState(() => _deviceStatus = status.reason?.isNotEmpty == true
             ? '${status.state}: ${status.reason}'
@@ -1555,7 +1599,10 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
         setState(() => _deviceStatus = 'Đã gửi yêu cầu chuẩn bị bài tập');
       }
     } catch (error) {
-      if (mounted) setState(() => _deviceStatus = 'Không thể chuẩn bị: $error');
+      if (mounted) {
+        setState(() => _deviceStatus =
+            'Chưa gửi được lệnh. Hãy giữ kết nối Bluetooth và thử lại.');
+      }
     } finally {
       if (mounted) setState(() => _preparing = false);
     }
@@ -1563,6 +1610,7 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
 
   @override
   void dispose() {
+    _statusSubscription?.cancel();
     super.dispose();
   }
 
@@ -1624,7 +1672,7 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
           ),
           const SizedBox(height: 8),
           FilledButton.icon(
-            onPressed: _preparing ? null : _prepare,
+            onPressed: _preparing || !_ble.isConnected ? null : _prepare,
             icon: _preparing
                 ? const SizedBox.square(
                     dimension: 18,
@@ -1635,6 +1683,12 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
           const SizedBox(height: 8),
           Text('Trạng thái thiết bị: $_deviceStatus',
               style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          if (!_ble.isConnected) ...[
+            const SizedBox(height: 8),
+            Text(
+                'Hãy kết nối ExoLeg-1 trong tab Thiết bị trước khi chuẩn bị bài tập.',
+                style: TextStyle(color: colorScheme.error)),
+          ],
           const SizedBox(height: 8),
           Text(LocaleKeys.Exercises_Disclaimer.tr(),
               style: TextStyle(color: colorScheme.onSurfaceVariant)),
@@ -1791,31 +1845,27 @@ class _MetaPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: foreground, size: 16),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-            ),
-          ],
-        ),
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: foreground, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+        ],
       ),
     );
   }

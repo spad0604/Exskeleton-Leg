@@ -57,7 +57,7 @@ public class PatientDataService {
     public Map<String, Object> home(UUID patientId, String displayName, String timezone) {
         ensurePatient(patientId);
         var device = jdbc.queryForMap("select * from patient_devices where patient_id = ? order by serial_number limit 1", patientId);
-        var plans = jdbc.queryForList("select p.*, e.name exercise_name from patient_plan_items p join exercises e on e.id=p.exercise_id where p.patient_id=? and p.plan_date=? and e.active=true order by p.id", patientId, Date.valueOf(LocalDate.now()));
+        var plans = jdbc.queryForList("select p.*, e.code exercise_code, e.name exercise_name, e.image_asset from patient_plan_items p join exercises e on e.id=p.exercise_id where p.patient_id=? and p.plan_date=? and e.active=true order by p.id", patientId, Date.valueOf(LocalDate.now()));
         var next = plans.stream().filter(p -> !"completed".equals(p.get("status"))).findFirst().map(this::homePlanOutput).orElse(null);
         var metrics = jdbc.queryForMap("select count(*) planned_count, coalesce(sum(case when status='completed' then 1 else 0 end),0) completed_count from patient_plan_items where patient_id=? and plan_date=?", patientId, Date.valueOf(LocalDate.now()));
         var sessions = jdbc.queryForMap("select coalesce(sum(active_seconds),0) active_seconds, avg(correctness_ratio) correctness_ratio from training_sessions where patient_id=? and started_at >= ?", patientId, Timestamp.from(LocalDate.now().atStartOfDay().toInstant(java.time.ZoneOffset.UTC)));
@@ -84,7 +84,7 @@ public class PatientDataService {
     }
 
     private Map<String,Object> homePlanOutput(Map<String,Object> p) {
-        return Map.of("id", p.get("id"), "exercise_id", p.get("exercise_id"), "exercise_name", p.get("exercise_name"),
+        return Map.of("id", p.get("id"), "exercise_id", p.get("exercise_id"), "exercise_code", p.getOrDefault("exercise_code", ""), "exercise_name", p.get("exercise_name"), "image_asset", p.getOrDefault("image_asset", ""),
                 "target", Map.of("kind", "repetitions", "sets", p.get("sets"), "repetitions_per_set", p.get("repetitions_per_set")),
                 "assistance_level", p.get("assistance_level"), "estimated_duration_seconds", p.get("estimated_duration_seconds"));
     }

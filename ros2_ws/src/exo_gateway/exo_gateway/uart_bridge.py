@@ -120,15 +120,27 @@ class UartBridge(Node):
             state.estop_active = bool(payload.get('estop_active', True))
             state.command_watchdog_ok = bool(payload.get('command_watchdog_ok', False))
             state.battery_percent = float(payload.get('battery_percent', -1.0))
+            state.battery_voltage = float(payload.get('battery_voltage', -1.0))
             state.fault_reason = str(payload.get('fault_reason', ''))[:256]
             state.header.stamp = self.get_clock().now().to_msg()
             self._state_pub.publish(state)
         elif kind == 'exercise_status':
             status = ExerciseStatus()
             status.session_id = str(payload.get('session_id', ''))[:64]
+            status.exercise_code = str(payload.get('exercise_code', ''))[:64]
             status.state = str(payload.get('state', 'rejected'))[:32]
             status.reason = str(payload.get('reason', ''))[:256]
             status.completed_repetitions = int(payload.get('completed_repetitions', 0))
+            self._exercise_status_pub.publish(status)
+        elif kind == 'exercise_selected':
+            exercise_code = str(payload.get('exercise_code', ''))[:64]
+            self.get_logger().info(f'ESP32 selected exercise {exercise_code}')
+            status = ExerciseStatus()
+            status.session_id = 'local-ui'
+            status.exercise_code = exercise_code
+            status.state = 'selected'
+            status.reason = ''
+            status.completed_repetitions = 0
             self._exercise_status_pub.publish(status)
         else:
             self.get_logger().warning(f'Ignoring unknown ESP32 UART message: {kind}')

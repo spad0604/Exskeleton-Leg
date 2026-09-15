@@ -15,9 +15,11 @@ from rclpy.node import Node
 
 from exo_interfaces.msg import DeviceState, ExerciseCommand, ExerciseStatus, PrepareExercise
 
-SERVICE_UUID = '6e400001-b5a3-f393-e0a9-e50e24dcca9e'
-CONTROL_UUID = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'
-STATUS_UUID = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'
+# GATT schema v2. A new UUID namespace forces Android to discard the stale
+# cached permissions from the previous bonding experiments.
+SERVICE_UUID = '6e400101-b5a3-f393-e0a9-e50e24dcca9e'
+CONTROL_UUID = '6e400102-b5a3-f393-e0a9-e50e24dcca9e'
+STATUS_UUID = '6e400103-b5a3-f393-e0a9-e50e24dcca9e'
 MAX_PAYLOAD_BYTES = 384
 
 
@@ -34,6 +36,7 @@ class BleBridge(Node):
     def _on_status(self, status):
         payload = {
             'v': 1, 'type': 'exercise_status', 'session_id': status.session_id,
+            'exercise_code': status.exercise_code,
             'state': status.state, 'reason': status.reason,
             'completed_repetitions': status.completed_repetitions,
         }
@@ -49,6 +52,7 @@ class BleBridge(Node):
         self._loop.call_soon_threadsafe(self._status_queue.put_nowait, {
             'v': 1, 'type': 'device_status', 'state': state_name,
             'battery_percent': state.battery_percent,
+            'battery_voltage': state.battery_voltage,
             'estop_active': state.estop_active,
             'command_watchdog_ok': state.command_watchdog_ok,
             'fault_reason': state.fault_reason,
@@ -148,7 +152,13 @@ async def run():
     # local name can exceed the BLE legacy advertisement limit (31 bytes).
     server = BlessServer(name='ExoLeg-1', loop=loop)
     await server.add_new_service(SERVICE_UUID)
-    writable = GATTCharacteristicProperties.write
+    # Nordic UART clients normally send command frames without waiting for an
+    # ATT response.  Expose both write modes: older clients can still use a
+    # response while Android can use the low-latency no-response path.
+    writable = (
+        GATTCharacteristicProperties.write
+        | GATTCharacteristicProperties.write_without_response
+    )
     await server.add_new_characteristic(
         SERVICE_UUID, CONTROL_UUID, writable, None, GATTAttributePermissions.writeable)
     readable_notifiable = GATTCharacteristicProperties.read | GATTCharacteristicProperties.notify

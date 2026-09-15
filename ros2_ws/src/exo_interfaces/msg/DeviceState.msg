@@ -7,5 +7,5 @@ uint8 state
 bool estop_active
 bool command_watchdog_ok
 float32 battery_percent
+float32 battery_voltage
 string fault_reason
-
