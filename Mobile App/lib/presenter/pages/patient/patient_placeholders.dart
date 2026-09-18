@@ -261,10 +261,13 @@ class _ProgressViewState extends State<_ProgressView> {
     _load();
   }
 
-  void _load() => _future = provider
-      .get<NetworkDataSource>()
-      .getProgressOverview(widget.patientId,
-          period: _selectedIndex == 0 ? 'week' : 'month');
+  void _load() {
+    _future = provider.get<NetworkDataSource>().getProgressOverview(
+          widget.patientId,
+          period: const ['day', 'week', 'month'][_selectedIndex],
+        );
+  }
+
   @override
   Widget build(BuildContext context) => FutureBuilder<Map<String, dynamic>>(
         future: _future,
@@ -274,14 +277,20 @@ class _ProgressViewState extends State<_ProgressView> {
                 title: LocaleKeys.Patient_Tabs_Progress.tr(),
                 children: [
                   if (snapshot.hasError)
-                    FilledButton(
-                        onPressed: () => setState(_load),
-                        child: Text(LocaleKeys.Common_Retry.tr()))
+                    _ProgressErrorCard(
+                      onRetry: () => setState(_load),
+                    )
                   else
                     const Center(child: CircularProgressIndicator())
                 ]);
           }
           final data = snapshot.data!;
+          final daily = (data['daily'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
+          final byExercise = (data['by_exercise'] as List<dynamic>? ?? const [])
+              .whereType<Map<String, dynamic>>()
+              .toList();
           return _PatientTabScaffold(
               title: LocaleKeys.Patient_Tabs_Progress.tr(),
               children: [
@@ -297,6 +306,7 @@ class _ProgressViewState extends State<_ProgressView> {
                           _load();
                         }),
                     labels: [
+                      'Hôm nay',
                       LocaleKeys.Patient_Progress_Week.tr(),
                       LocaleKeys.Patient_Progress_Month.tr(),
                     ]),
@@ -334,6 +344,18 @@ class _ProgressViewState extends State<_ProgressView> {
                   assetPath: 'assets/images/gen_assets/asset_progress.png',
                   accent: _AccentTone.neutral,
                 ),
+                const SizedBox(height: 16),
+                _PersonalInsightCard(
+                  text: data['insight'] as String? ??
+                      'Mỗi phiên tập đều tạo nên tiến bộ của bạn.',
+                  streak: (data['streak_days'] as num?)?.toInt() ?? 0,
+                ),
+                const SizedBox(height: 16),
+                _DailyActivityChart(days: daily),
+                if (byExercise.isNotEmpty) ...[
+                  const SizedBox(height: 16),
+                  _FavoriteExerciseCard(exercises: byExercise),
+                ],
                 const SizedBox(height: 24),
                 Text(
                     LocaleKeys.Patient_Progress_StreakDays.tr(
@@ -347,17 +369,281 @@ class _ProgressViewState extends State<_ProgressView> {
                 ...((data['recent_sessions'] as List<dynamic>? ?? const [])
                     .whereType<Map<String, dynamic>>()
                     .map((session) => _SessionTile(
-                          title: '${session['status']}',
-                          subtitle: '${session['started_at']}',
-                          icon: session['status'] == 'completed'
-                              ? Icons.done
-                              : Icons.info_outline,
+                          exerciseCode: '${session['exercise_code'] ?? ''}',
+                          status: '${session['status'] ?? ''}',
+                          startedAt: '${session['started_at'] ?? ''}',
+                          repetitions:
+                              (session['completed_repetitions'] as num?)
+                                      ?.toInt() ??
+                                  0,
+                          activeSeconds:
+                              (session['active_seconds'] as num?)?.toInt() ?? 0,
                         ))),
                 if ((data['recent_sessions'] as List<dynamic>? ?? const [])
                     .isEmpty)
                   Text(LocaleKeys.Common_NotEnoughData.tr()),
               ]);
         },
+      );
+}
+
+class _ProgressErrorCard extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ProgressErrorCard({required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) => Card(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            children: [
+              Icon(Icons.cloud_off_rounded,
+                  size: 42, color: Theme.of(context).colorScheme.primary),
+              const SizedBox(height: 12),
+              Text('Chưa tải được thống kê',
+                  style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: 6),
+              Text(
+                'Dữ liệu luyện tập đang được đồng bộ. Vui lòng thử lại sau một chút.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(LocaleKeys.Common_Retry.tr()),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class _PersonalInsightCard extends StatelessWidget {
+  final String text;
+  final int streak;
+
+  const _PersonalInsightCard({required this.text, required this.streak});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [colors.primaryContainer, colors.tertiaryContainer],
+        ),
+        borderRadius: BorderRadius.circular(22),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.auto_awesome, color: colors.primary, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Gợi ý dành riêng cho bạn',
+                    style: TextStyle(
+                      color: colors.onPrimaryContainer,
+                      fontWeight: FontWeight.w800,
+                    )),
+                const SizedBox(height: 5),
+                Text(text, style: TextStyle(color: colors.onPrimaryContainer)),
+                if (streak > 0) ...[
+                  const SizedBox(height: 8),
+                  Text('🔥 $streak ngày liên tiếp',
+                      style: TextStyle(
+                        color: colors.onPrimaryContainer,
+                        fontWeight: FontWeight.w700,
+                      )),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DailyActivityChart extends StatelessWidget {
+  final List<Map<String, dynamic>> days;
+
+  const _DailyActivityChart({required this.days});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final values = days
+        .map((day) => (day['active_seconds'] as num?)?.toDouble() ?? 0)
+        .toList();
+    final maximum =
+        values.fold<double>(0, (max, value) => value > max ? value : max);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Nhịp tập luyện',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    )),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 112,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  for (var index = 0; index < days.length; index++)
+                    Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 3),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Expanded(
+                              child: Align(
+                                alignment: Alignment.bottomCenter,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 450),
+                                  height: maximum == 0
+                                      ? 6
+                                      : 8 + 72 * values[index] / maximum,
+                                  width: 18,
+                                  decoration: BoxDecoration(
+                                    color: values[index] > 0
+                                        ? colors.primary
+                                        : colors.surfaceContainerHighest,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(_shortDate('${days[index]['date']}'),
+                                style: Theme.of(context).textTheme.labelSmall),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _shortDate(String value) =>
+      value.length >= 5 ? value.substring(5) : value;
+}
+
+class _FavoriteExerciseCard extends StatelessWidget {
+  final List<Map<String, dynamic>> exercises;
+
+  const _FavoriteExerciseCard({required this.exercises});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final favorite = exercises.first;
+    final code = '${favorite['exercise_code'] ?? 'Bài tập'}';
+    final reps = (favorite['repetitions'] as num?)?.toInt() ?? 0;
+    final sessions = (favorite['session_count'] as num?)?.toInt() ?? 0;
+    final activeSeconds = (favorite['active_seconds'] as num?)?.toInt() ?? 0;
+    final name = _localizedExerciseName({'code': code});
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [colors.secondaryContainer, colors.primaryContainer],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                  color: colors.secondary,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child:
+                    Icon(Icons.trending_up_rounded, color: colors.onSecondary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Bài tập nổi bật',
+                        style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                              color: colors.onSecondaryContainer,
+                              fontWeight: FontWeight.w700,
+                            )),
+                    const SizedBox(height: 3),
+                    Text(name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style:
+                            Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                )),
+                  ],
+                ),
+              ),
+              Icon(Icons.arrow_forward_rounded,
+                  color: colors.onSecondaryContainer),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              _ExerciseStat(label: 'Lần tập', value: '$sessions'),
+              _ExerciseStat(label: 'Số lần', value: '$reps'),
+              _ExerciseStat(
+                  label: 'Thời gian',
+                  value: '${(activeSeconds / 60).round()}p'),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ExerciseStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    )),
+            const SizedBox(height: 2),
+            Text(label, style: Theme.of(context).textTheme.labelSmall),
+          ],
+        ),
       );
 }
 
@@ -1565,7 +1851,10 @@ class _ExerciseDetailPage extends StatefulWidget {
 class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
   final _ble = ExoBleService.shared;
   String _deviceStatus = 'Chưa kết nối thiết bị';
+  ExerciseDeviceStatus? _liveExercise;
   bool _preparing = false;
+  bool _starting = false;
+  bool _completionSent = false;
   StreamSubscription<ExerciseDeviceStatus>? _statusSubscription;
 
   @override
@@ -1576,11 +1865,79 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
     }
     _statusSubscription = _ble.status.listen((status) {
       if (mounted) {
-        setState(() => _deviceStatus = status.reason?.isNotEmpty == true
-            ? '${status.state}: ${status.reason}'
-            : status.state);
+        setState(() {
+          _liveExercise = status;
+          _deviceStatus = status.reason?.isNotEmpty == true
+              ? '${status.state}: ${status.reason}'
+              : _friendlyExerciseState(status.state);
+        });
+        if (status.state == 'completed' && !_completionSent) {
+          _completionSent = true;
+          _recordCompletion(status);
+        }
       }
     });
+  }
+
+  Future<void> _recordCompletion(ExerciseDeviceStatus status) async {
+    final patientId = context.read<AuthBloc>().state.account?.id;
+    final exercise = widget.planItem['exercise'] as Map;
+    if (patientId == null) return;
+    try {
+      await provider.get<NetworkDataSource>().completeTrainingSession(
+            patientId: patientId,
+            sessionId:
+                '${widget.planItem['session_id'] ?? widget.planItem['id']}',
+            planItemId: '${widget.planItem['id']}',
+            exerciseCode: '${exercise['code']}',
+            completedRepetitions: status.totalRepetitions,
+            activeSeconds: status.activeMs ~/ 1000,
+          );
+      if (mounted) {
+        setState(() => _deviceStatus = 'Đã hoàn thành và đồng bộ tiến độ');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() =>
+            _deviceStatus = 'Đã hoàn thành trên thiết bị, chưa đồng bộ server');
+      }
+    }
+  }
+
+  String _friendlyExerciseState(String state) => switch (state) {
+        'running' => 'Đang khởi động bài tập',
+        'flexing' => 'Đang nâng/chuyển động lên',
+        'extending' => 'Đang trở về tư thế ban đầu',
+        'paused' => 'Đã tạm dừng',
+        'completed' => 'Đã hoàn thành bài tập',
+        'stopped' => 'Đã dừng bài tập',
+        'prepared' => 'Thiết bị đã sẵn sàng',
+        'not_ready' => 'Thiết bị chưa sẵn sàng',
+        _ => state,
+      };
+
+  Future<void> _start() async {
+    final exercise = widget.planItem['exercise'] as Map;
+    final target = widget.planItem['target'] as Map? ?? const {};
+    setState(() => _starting = true);
+    try {
+      await _ble.startExercise(
+        sessionId: '${widget.planItem['session_id'] ?? widget.planItem['id']}',
+        planItemId: '${widget.planItem['id']}',
+        exerciseCode: '${exercise['code']}',
+        sets: (target['sets'] as num?)?.toInt() ?? 1,
+        repetitions: (target['repetitions_per_set'] as num?)?.toInt() ?? 1,
+      );
+      if (mounted) {
+        setState(() => _deviceStatus = 'Đã bắt đầu bài tập');
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _deviceStatus = 'Không gửi được lệnh bắt đầu');
+      }
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
   }
 
   Future<void> _prepare() async {
@@ -1681,8 +2038,22 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
             label: const Text('Chuẩn bị bài tập trên thiết bị'),
           ),
           const SizedBox(height: 8),
+          FilledButton.icon(
+            onPressed: _starting || !_ble.isConnected ? null : _start,
+            icon: _starting
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.play_arrow),
+            label: const Text('Bắt đầu bài tập'),
+          ),
+          const SizedBox(height: 8),
           Text('Trạng thái thiết bị: $_deviceStatus',
               style: TextStyle(color: colorScheme.onSurfaceVariant)),
+          if (_liveExercise != null) ...[
+            const SizedBox(height: 14),
+            _ExerciseTelemetryCard(status: _liveExercise!),
+          ],
           if (!_ble.isConnected) ...[
             const SizedBox(height: 8),
             Text(
@@ -1692,6 +2063,112 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
           const SizedBox(height: 8),
           Text(LocaleKeys.Exercises_Disclaimer.tr(),
               style: TextStyle(color: colorScheme.onSurfaceVariant)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExerciseTelemetryCard extends StatelessWidget {
+  final ExerciseDeviceStatus status;
+
+  const _ExerciseTelemetryCard({required this.status});
+
+  String _duration(int milliseconds) {
+    final seconds = milliseconds ~/ 1000;
+    final minutes = seconds ~/ 60;
+    return '${minutes.toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final target = status.targetTotalRepetitions;
+    final progress =
+        target == 0 ? 0.0 : (status.totalRepetitions / target).clamp(0.0, 1.0);
+    final averageSeconds = status.totalRepetitions == 0
+        ? 0.0
+        : status.activeMs / 1000 / status.totalRepetitions;
+    return Card(
+      color: colors.secondaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Icon(Icons.insights, color: colors.onSecondaryContainer),
+              const SizedBox(width: 8),
+              Text('Tiến độ trực tiếp',
+                  style: TextStyle(
+                    color: colors.onSecondaryContainer,
+                    fontWeight: FontWeight.w800,
+                  )),
+              const Spacer(),
+              Text('${(progress * 100).round()}%',
+                  style: TextStyle(
+                    color: colors.onSecondaryContainer,
+                    fontWeight: FontWeight.w800,
+                  )),
+            ]),
+            const SizedBox(height: 10),
+            TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0, end: progress),
+              duration: const Duration(milliseconds: 400),
+              builder: (context, value, _) =>
+                  LinearProgressIndicator(value: value),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _TelemetryChip(
+                  icon: Icons.repeat,
+                  label: '${status.totalRepetitions}/$target lần',
+                ),
+                _TelemetryChip(
+                  icon: Icons.layers_outlined,
+                  label: '${status.completedSets}/${status.targetSets} set',
+                ),
+                _TelemetryChip(
+                  icon: Icons.timer_outlined,
+                  label: _duration(status.activeMs),
+                ),
+                _TelemetryChip(
+                  icon: Icons.speed,
+                  label: '${averageSeconds.toStringAsFixed(1)}s/lần',
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TelemetryChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _TelemetryChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colors.surface.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: colors.onSecondaryContainer),
+          const SizedBox(width: 5),
+          Text(label, style: TextStyle(color: colors.onSecondaryContainer)),
         ],
       ),
     );
@@ -2694,34 +3171,95 @@ class _ActionRow extends StatelessWidget {
 }
 
 class _SessionTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final IconData icon;
+  final String exerciseCode;
+  final String status;
+  final String startedAt;
+  final int repetitions;
+  final int activeSeconds;
 
   const _SessionTile({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
+    required this.exerciseCode,
+    required this.status,
+    required this.startedAt,
+    required this.repetitions,
+    required this.activeSeconds,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-      leading: Container(
-        width: 42,
-        height: 42,
-        decoration: BoxDecoration(
-          color: colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Icon(icon, color: colorScheme.onPrimaryContainer),
+    final completed = status == 'completed';
+    final name = _localizedExerciseName({'code': exerciseCode});
+    final date = DateTime.tryParse(startedAt);
+    final dateLabel = date == null
+        ? 'Vừa cập nhật'
+        : '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')} · ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: .42),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: completed
+                  ? colorScheme.primaryContainer
+                  : colorScheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: Icon(
+              completed ? Icons.check_rounded : Icons.schedule_rounded,
+              color: completed
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onTertiaryContainer,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(name.isEmpty ? exerciseCode : name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        )),
+                const SizedBox(height: 5),
+                Text(
+                    '$dateLabel · $repetitions lần · ${(activeSeconds / 60).round()} phút',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+            decoration: BoxDecoration(
+              color: completed
+                  ? colorScheme.primaryContainer
+                  : colorScheme.tertiaryContainer,
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              completed ? 'Đã xong' : _localizedTrainingStatus(status),
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: completed
+                        ? colorScheme.onPrimaryContainer
+                        : colorScheme.onTertiaryContainer,
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

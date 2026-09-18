@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:developer' as developer;
 
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'exo_ble_protocol.dart';
@@ -13,9 +14,13 @@ class ExoBleService {
   ExoBleService({FlutterReactiveBle? ble}) : _ble = ble ?? FlutterReactiveBle();
 
   final FlutterReactiveBle _ble;
+  static const _native = MethodChannel('exo_leg/native_ble');
+  static const _nativeStatus = EventChannel('exo_leg/native_ble_status');
   StreamSubscription<ConnectionStateUpdate>? _connection;
+  StreamSubscription<dynamic>? _statusSubscription;
+  bool _statusRetryScheduled = false;
+  Future<void> _writeQueue = Future<void>.value();
   Future<void>? _connecting;
-  int _connectionGeneration = 0;
   QualifiedCharacteristic? _control;
   final _status = StreamController<ExerciseDeviceStatus>.broadcast();
   final _deviceStatus = StreamController<LiveDeviceStatus>.broadcast();
@@ -82,14 +87,39 @@ class ExoBleService {
   Future<void> _connectOnce(String? deviceId) async {
     await _resetConnection();
     final id = deviceId ?? (await _firstDiscoveredDeviceId());
-    await _connectToDevice(id);
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await _connectToDevice(id);
+        return;
+      } catch (error) {
+        if (attempt == 3 || !_isTransientConnectionError(error)) rethrow;
+        developer.log(
+            'Transient BLE connect failure; retrying '
+            '(attempt ${attempt + 1}/3): $error',
+            name: 'ExoBle');
+        await Future<void>.delayed(Duration(milliseconds: 700 * attempt));
+      }
+    }
+  }
+
+  bool _isTransientConnectionError(Object error) {
+    final message = error.toString().toLowerCase();
+    return message.contains('timed out') ||
+        message.contains('status=257') ||
+        message.contains('disconnected') ||
+        message.contains('status=133');
   }
 
   Future<void> _resetConnection() async {
-    _connectionGeneration++;
     await _connection?.cancel();
+    await _statusSubscription?.cancel();
+    _statusSubscription = null;
     _connection = null;
     _control = null;
+    await _native.invokeMethod<void>('disconnect');
+    // Android needs a short gap after close() before a new GATT client is
+    // allocated for the same peripheral.
+    await Future<void>.delayed(const Duration(milliseconds: 350));
   }
 
   Future<void> _ensureReady() async {
@@ -115,41 +145,13 @@ class ExoBleService {
   Future<void> _connectToDevice(String deviceId) async {
     developer.log('Connecting GATT to $deviceId', name: 'ExoBle');
     final serviceId = Uuid.parse(ExoBleProtocol.serviceUuid);
-    final generation = _connectionGeneration;
-    final connected = Completer<void>();
-    _connection = _ble
-        .connectToDevice(
-      id: deviceId,
-      connectionTimeout: const Duration(seconds: 30),
-    )
-        .listen((update) {
-      developer.log('GATT state: ${update.connectionState}', name: 'ExoBle');
-      if (update.connectionState == DeviceConnectionState.connected &&
-          !connected.isCompleted) {
-        connected.complete();
-      } else if (update.connectionState == DeviceConnectionState.disconnected &&
-          !connected.isCompleted) {
-        connected
-            .completeError(StateError('Device disconnected while connecting'));
-      } else if (update.connectionState == DeviceConnectionState.disconnected) {
-        if (generation == _connectionGeneration) {
-          unawaited(_resetConnection());
-        }
-      }
-    }, onError: (Object error, StackTrace stackTrace) {
-      developer.log('GATT connection failed: $error',
-          name: 'ExoBle', error: error, stackTrace: stackTrace);
-      if (!connected.isCompleted) connected.completeError(error, stackTrace);
-    });
     try {
-      await connected.future.timeout(const Duration(seconds: 30));
-    } on TimeoutException {
-      developer.log('GATT connection timed out after 30 seconds',
+      await _native.invokeMethod<void>('connect', {'deviceId': deviceId});
+      developer.log('Native GATT connected and services discovered',
           name: 'ExoBle');
-      await _resetConnection();
-      throw StateError('GATT connection timed out after 30 seconds');
     } catch (error) {
       await _resetConnection();
+      developer.log('Native GATT connection failed: $error', name: 'ExoBle');
       rethrow;
     }
 
@@ -158,12 +160,56 @@ class ExoBleService {
       characteristicId: Uuid.parse(ExoBleProtocol.controlUuid),
       deviceId: deviceId,
     );
-    // Do not read or subscribe immediately after connecting. On Android this
-    // forces a second service-discovery while the OS may still be resolving a
-    // stale bond, causing repeated GATT failures. Control writes are deferred
-    // until the user explicitly prepares an exercise.
+    await _startStatusSubscription(deviceId);
+    // Status subscription is best-effort and retried because Android may still
+    // be finishing bonding/service discovery. It must not make transport
+    // connection fail; control writes remain explicitly user-triggered.
     developer.log('GATT transport connected; awaiting user command',
         name: 'ExoBle');
+  }
+
+  Future<void> _startStatusSubscription(String deviceId) async {
+    await _statusSubscription?.cancel();
+    for (var attempt = 1; attempt <= 3; attempt++) {
+      try {
+        _statusSubscription = _nativeStatus.receiveBroadcastStream().listen(
+          (event) {
+            try {
+              final bytes = List<int>.from(event as List<dynamic>);
+              final payload = decodeBleStatus(bytes);
+              final type = payload['type'];
+              if (type == 'exercise_status') {
+                _status.add(ExerciseDeviceStatus.fromJson(payload));
+              } else if (type == 'device_status') {
+                _deviceStatus.add(LiveDeviceStatus.fromJson(payload));
+              }
+            } catch (error, stackTrace) {
+              developer.log('BLE status decode failed: $error',
+                  name: 'ExoBle', error: error, stackTrace: stackTrace);
+            }
+          },
+          onError: (Object error, StackTrace stackTrace) {
+            developer.log('BLE status subscription unavailable: $error',
+                name: 'ExoBle', error: error, stackTrace: stackTrace);
+            if (!_statusRetryScheduled) {
+              _statusRetryScheduled = true;
+              unawaited(Future<void>.delayed(const Duration(seconds: 3), () {
+                _statusRetryScheduled = false;
+                return _startStatusSubscription(deviceId);
+              }));
+            }
+          },
+        );
+        await _native.invokeMethod<void>('subscribe');
+        return;
+      } catch (error, stackTrace) {
+        developer.log('BLE status subscription retry $attempt failed: $error',
+            name: 'ExoBle', error: error, stackTrace: stackTrace);
+        if (attempt < 3) {
+          await Future<void>.delayed(Duration(seconds: attempt * 2));
+        }
+      }
+    }
   }
 
   Future<void> prepareExercise({
@@ -189,6 +235,7 @@ class ExoBleService {
     required String exerciseCode,
     String planItemId = '',
     String side = 'both',
+    int sets = 1,
     int repetitions = 1,
     double assistPercent = 0,
   }) {
@@ -203,6 +250,7 @@ class ExoBleService {
       planItemId: planItemId,
       action: 'start',
       side: resolvedSide,
+      sets: sets,
       repetitions: repetitions,
       assistPercent: assistPercent,
     );
@@ -211,21 +259,25 @@ class ExoBleService {
   Future<void> pauseExercise({
     required String sessionId,
     String exerciseCode = 'walk',
+    int sets = 1,
   }) =>
       _sendExerciseCommand(
         sessionId: sessionId,
         exerciseCode: exerciseCode,
         action: 'pause',
+        sets: sets,
       );
 
   Future<void> stopExercise({
     required String sessionId,
     String exerciseCode = 'walk',
+    int sets = 1,
   }) =>
       _sendExerciseCommand(
         sessionId: sessionId,
         exerciseCode: exerciseCode,
         action: 'stop',
+        sets: sets,
       );
 
   Future<void> _sendExerciseCommand({
@@ -234,6 +286,7 @@ class ExoBleService {
     required String action,
     String planItemId = '',
     String side = 'both',
+    int sets = 1,
     int repetitions = 1,
     double assistPercent = 0,
   }) async {
@@ -245,26 +298,31 @@ class ExoBleService {
       'exercise_code': exerciseCode,
       'action': action,
       'side': side,
+      'sets': sets,
       'repetitions': repetitions,
       'assist_percent': assistPercent,
     });
   }
 
   Future<void> _write(Map<String, Object?> payload) async {
+    final next = _writeQueue.then((_) => _writeUnlocked(payload));
+    _writeQueue = next.catchError((_) {});
+    return next;
+  }
+
+  Future<void> _writeUnlocked(Map<String, Object?> payload) async {
     final characteristic = _control;
     if (characteristic == null) {
       throw StateError('Chưa kết nối ExoLeg-1 qua Bluetooth');
     }
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
-        // The Pi exposes a Nordic-UART style control characteristic.  Do not
-        // wait for an ATT write response here: some Android stacks start an
-        // unnecessary bond/service-resolution cycle for a response write,
-        // even though this characteristic has no encryption requirement.
-        await _ble.writeCharacteristicWithoutResponse(
-          characteristic,
-          value: ExoBleProtocol.encode(payload),
-        );
+        // The protocol defines the control point as write-with-response. This
+        // also gives Android a definitive ATT completion before a subsequent
+        // command or status subscription starts.
+        await _native.invokeMethod<void>('write', {
+          'value': Uint8List.fromList(ExoBleProtocol.encode(payload)),
+        });
         developer.log('BLE control write succeeded (attempt $attempt)',
             name: 'ExoBle');
         return;
@@ -275,8 +333,9 @@ class ExoBleService {
             message.contains('gatt');
         if (!transient || attempt == 3) break;
         developer.log(
-            'BLE control write waiting for Android GATT (attempt $attempt)',
-            name: 'ExoBle');
+            'BLE control write waiting for Android GATT (attempt $attempt): $error',
+            name: 'ExoBle',
+            error: error);
         await Future<void>.delayed(Duration(seconds: attempt * 2));
       }
     }
@@ -285,6 +344,7 @@ class ExoBleService {
   }
 
   Future<void> dispose() async {
+    await _statusSubscription?.cancel();
     await _connection?.cancel();
     await _status.close();
     await _deviceStatus.close();

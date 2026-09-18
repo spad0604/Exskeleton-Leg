@@ -24,5 +24,7 @@ class PatientDataServiceTests {
         assertThat(patientData.plans(id, "today")).hasSize(8);
         assertThat(patientData.exercises()).hasSize(8);
         assertThat(patientData.devices(id)).hasSize(1);
+        assertThat(patientData.progress(id, "day"))
+                .containsKeys("period", "daily", "by_exercise", "insight", "total_repetitions");
     }
 }

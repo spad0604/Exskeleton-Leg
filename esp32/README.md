@@ -1,9 +1,8 @@
-# ESP32 UART2 controller
+# ESP32 USB serial controller
 
-`exo_controller.ino` is the ESP32 local UI and commissioning controller. Wire
-Pi UART1 (`/dev/serial0` with the current Pi overlay) TX/RX crossed to ESP32
-UART2 RX2/TX2 (GPIO16/17) and connect grounds. Confirm the exact Pi header pin
-mapping before powering the actuator system.
+`exo_controller.ino` is the ESP32 local UI and commissioning controller. Use a
+USB Type-C data cable from the ESP32 to the Pi. The CP210x bridge appears on
+the Pi as `/dev/ttyUSB0`, at 115200 baud, 8N1. No Pi GPIO UART wiring is used.
 
 ## Local controls
 
@@ -30,9 +29,10 @@ The firmware accepts frames from the Pi in this format:
 EXO1|{"type":"exercise_command",...}|CRC16\n
 ```
 
-The menu and UART protocol use the same dataset, so a selected item can later
-map directly to a motion profile. It currently reports `not_ready` for motion
-commands by design. Implement motor drivers only after adding encoder
+The menu and USB serial protocol use the same dataset, so a selected item can
+later map directly to a motion profile. Commissioning mode currently performs
+one dry-run flexion/extension cycle and reports `completed` without driving
+motors. Disable it before connecting an actuator. Implement motor drivers only after adding encoder
 validation, current/temperature limits, hardware E-stop, watchdog timeout, and
 a bench/HIL test. Supported exercise codes are:
 

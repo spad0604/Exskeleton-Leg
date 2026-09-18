@@ -7,6 +7,8 @@ import com.example.leg.shared.ApiResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -77,10 +79,19 @@ public class PatientSystemController {
             @RequestParam(defaultValue = "week") String period,
             @AuthenticationPrincipal AuthenticatedUser principal) {
         requireSelf(patientId, principal);
-        if (!period.equals("week") && !period.equals("month")) {
+        if (!period.equals("day") && !period.equals("week") && !period.equals("month")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation.invalid_period", "Period không hợp lệ.");
         }
         return ApiResponse.of(patientData.progress(patientId, period));
+    }
+
+    @PostMapping("/patients/{patientId}/training-sessions/complete")
+    public ApiResponse<Map<String, Object>> completeTrainingSession(
+            @PathVariable UUID patientId,
+            @RequestBody CompletionRequest request,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        requireSelf(patientId, principal);
+        return ApiResponse.of(patientData.completeSession(patientId, request));
     }
 
     @GetMapping("/devices")
@@ -112,5 +123,14 @@ public class PatientSystemController {
 
     private ApiException denied() {
         return new ApiException(HttpStatus.FORBIDDEN, "authorization.denied", "Bạn không có quyền xem dữ liệu này.");
+    }
+
+    public record CompletionRequest(
+            UUID sessionId,
+            UUID planItemId,
+            String exerciseCode,
+            int completedRepetitions,
+            int activeSeconds,
+            double correctnessRatio) {
     }
 }

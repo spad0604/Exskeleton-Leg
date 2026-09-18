@@ -12,4 +12,5 @@ uint8 SIDE_LEFT=1
 uint8 SIDE_RIGHT=2
 uint8 side
 uint16 repetitions
+uint16 sets
 float32 assist_percent

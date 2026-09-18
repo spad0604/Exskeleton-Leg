@@ -39,6 +39,14 @@ class BleBridge(Node):
             'exercise_code': status.exercise_code,
             'state': status.state, 'reason': status.reason,
             'completed_repetitions': status.completed_repetitions,
+            'completed_sets': status.completed_sets,
+            'target_sets': status.target_sets,
+            'target_repetitions': status.target_repetitions,
+            'elapsed_ms': status.elapsed_ms,
+            'active_ms': status.active_ms,
+            'repetition_duration_ms': status.repetition_duration_ms,
+            'total_repetitions': status.total_repetitions,
+            'target_total_repetitions': status.target_total_repetitions,
         }
         self._loop.call_soon_threadsafe(self._status_queue.put_nowait, payload)
 
@@ -76,6 +84,7 @@ class BleBridge(Node):
             self.get_logger().warning(f'Rejected BLE control packet: {error}')
             self._loop.call_soon_threadsafe(self._status_queue.put_nowait, {
                 'v': 1, 'type': 'exercise_status', 'state': 'rejected', 'reason': str(error),
+                'completed_repetitions': 0, 'completed_sets': 0,
             })
 
     def _handle_prepare(self, payload):
@@ -118,8 +127,9 @@ class BleBridge(Node):
         message.action = actions[action]
         message.side = sides[side]
         message.repetitions = int(payload.get('repetitions', 1))
+        message.sets = int(payload.get('sets', 1))
         message.assist_percent = float(payload.get('assist_percent', 0.0))
-        if not message.session_id or not message.exercise_code:
+        if not message.session_id or not message.exercise_code or not 1 <= message.sets <= 20:
             raise ValueError('invalid exercise command')
         self._exercise_pub.publish(message)
 

@@ -19,6 +19,14 @@ class ExerciseDeviceStatus {
   final String? sessionId;
   final String? reason;
   final int? completedRepetitions;
+  final int completedSets;
+  final int targetSets;
+  final int targetRepetitions;
+  final int elapsedMs;
+  final int activeMs;
+  final int repetitionDurationMs;
+  final int totalRepetitions;
+  final int targetTotalRepetitions;
 
   const ExerciseDeviceStatus({
     required this.state,
@@ -26,6 +34,14 @@ class ExerciseDeviceStatus {
     this.sessionId,
     this.reason,
     this.completedRepetitions,
+    this.completedSets = 0,
+    this.targetSets = 0,
+    this.targetRepetitions = 0,
+    this.elapsedMs = 0,
+    this.activeMs = 0,
+    this.repetitionDurationMs = 0,
+    this.totalRepetitions = 0,
+    this.targetTotalRepetitions = 0,
   });
 
   factory ExerciseDeviceStatus.fromJson(Map<String, dynamic> json) =>
@@ -35,6 +51,16 @@ class ExerciseDeviceStatus {
         sessionId: json['session_id'] as String?,
         reason: json['reason'] as String?,
         completedRepetitions: (json['completed_repetitions'] as num?)?.toInt(),
+        completedSets: (json['completed_sets'] as num?)?.toInt() ?? 0,
+        targetSets: (json['target_sets'] as num?)?.toInt() ?? 0,
+        targetRepetitions: (json['target_repetitions'] as num?)?.toInt() ?? 0,
+        elapsedMs: (json['elapsed_ms'] as num?)?.toInt() ?? 0,
+        activeMs: (json['active_ms'] as num?)?.toInt() ?? 0,
+        repetitionDurationMs:
+            (json['repetition_duration_ms'] as num?)?.toInt() ?? 0,
+        totalRepetitions: (json['total_repetitions'] as num?)?.toInt() ?? 0,
+        targetTotalRepetitions:
+            (json['target_total_repetitions'] as num?)?.toInt() ?? 0,
       );
 }
 

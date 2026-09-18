@@ -1,4 +1,4 @@
-"""Pi UART1 <-> ESP32 UART2 bridge.
+"""Pi USB serial (CP210x) <-> ESP32 USB Type-C bridge.
 
 The wire format is deliberately inspectable while the hardware protocol is
 being commissioned:
@@ -47,7 +47,7 @@ def decode_frame(line):
 class UartBridge(Node):
     def __init__(self):
         super().__init__('uart_bridge')
-        self.declare_parameter('device', '/dev/serial1')
+        self.declare_parameter('device', '/dev/ttyUSB0')
         self.declare_parameter('baudrate', 115200)
         self.declare_parameter('reconnect_sec', 2.0)
         self._serial = None
@@ -66,7 +66,7 @@ class UartBridge(Node):
             device = str(self.get_parameter('device').value)
             baudrate = int(self.get_parameter('baudrate').value)
             self._serial = serial.Serial(device, baudrate=baudrate, timeout=0.5, write_timeout=0.5)
-            self.get_logger().info(f'Connected ESP32 UART at {device} ({baudrate} baud)')
+            self.get_logger().info(f'Connected ESP32 USB serial at {device} ({baudrate} baud)')
         except Exception as error:  # pyserial reports several OS-specific errors
             self._serial = None
             self.get_logger().warning(f'ESP32 UART unavailable: {error}')
@@ -104,6 +104,7 @@ class UartBridge(Node):
             'session_id': command.session_id, 'plan_item_id': command.plan_item_id,
             'exercise_code': command.exercise_code, 'action': actions.get(command.action, 'stop'),
             'side': sides.get(command.side, 'both'), 'repetitions': int(command.repetitions),
+            'sets': int(command.sets),
             'assist_percent': float(command.assist_percent),
         })
 
@@ -131,6 +132,14 @@ class UartBridge(Node):
             status.state = str(payload.get('state', 'rejected'))[:32]
             status.reason = str(payload.get('reason', ''))[:256]
             status.completed_repetitions = int(payload.get('completed_repetitions', 0))
+            status.completed_sets = int(payload.get('completed_sets', 0))
+            status.target_sets = int(payload.get('target_sets', 0))
+            status.target_repetitions = int(payload.get('target_repetitions', 0))
+            status.elapsed_ms = int(payload.get('elapsed_ms', 0))
+            status.active_ms = int(payload.get('active_ms', 0))
+            status.repetition_duration_ms = int(payload.get('repetition_duration_ms', 0))
+            status.total_repetitions = int(payload.get('total_repetitions', 0))
+            status.target_total_repetitions = int(payload.get('target_total_repetitions', 0))
             self._exercise_status_pub.publish(status)
         elif kind == 'exercise_selected':
             exercise_code = str(payload.get('exercise_code', ''))[:64]
@@ -141,6 +150,14 @@ class UartBridge(Node):
             status.state = 'selected'
             status.reason = ''
             status.completed_repetitions = 0
+            status.completed_sets = 0
+            status.target_sets = 0
+            status.target_repetitions = 0
+            status.elapsed_ms = 0
+            status.active_ms = 0
+            status.repetition_duration_ms = 0
+            status.total_repetitions = 0
+            status.target_total_repetitions = 0
             self._exercise_status_pub.publish(status)
         else:
             self.get_logger().warning(f'Ignoring unknown ESP32 UART message: {kind}')
@@ -156,11 +173,25 @@ class UartBridge(Node):
                 line = self._serial.readline()
                 if not line:
                     continue
+            except Exception as error:
+                self.get_logger().warning(f'UART read failed: {error}')
+                try:
+                    self._serial.close()
+                finally:
+                    self._serial = None
+                continue
+            try:
                 payload = decode_frame(line)
+            except Exception as error:
+                # USB-UART ESP32 boot messages and monitor text are not
+                # protocol frames. Ignore them without resetting the port.
+                self.get_logger().debug(f'Ignoring non-protocol USB input: {error}')
+                continue
+            try:
                 self.get_logger().info(f"UART RX {payload.get('type', 'unknown')}")
                 self._handle_rx(payload)
             except Exception as error:
-                self.get_logger().warning(f'UART RX rejected: {error}')
+                self.get_logger().warning(f'UART frame handling failed: {error}')
                 try:
                     self._serial.close()
                 finally:

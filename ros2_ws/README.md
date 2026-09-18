@@ -8,7 +8,7 @@ tới motor controller.
 
 ```
 Flutter app -- BLE (lệnh cấp cao) --> Pi BLE bridge --> /exo/exercise/request
-ESP32 buttons/OLED -- UART1/UART2 --> Pi UART bridge --> ROS2 safety gateway
+ESP32 buttons/OLED -- USB Type-C/CP210x --> Pi serial bridge --> ROS2 safety gateway
 Backend ---- HTTPS/MQTT (profile, plan, log) -------> Pi cloud sync
                                                      safety gate --> actuator adapter
 ```
@@ -53,7 +53,7 @@ container `ros:jazzy-ros-base`. Code workspace được mount từ `~/ros2_ws` c
 Trên Pi host, kiểm tra UART và Bluetooth:
 
 ```bash
-ls -l /dev/serial1 /dev/ttyAMA* /dev/ttyS* 2>/dev/null
+ls -l /dev/ttyUSB* /dev/serial/by-id/* 2>/dev/null
 sudo systemctl enable --now bluetooth
 bluetoothctl show
 ```
@@ -79,22 +79,26 @@ source install/setup.bash
 scripts/run_gateway.sh
 ```
 
-Trên Pi 4B, sau khi bật `enable_uart=1` và `dtoverlay=miniuart-bt`, UART trên
-chân GPIO là `/dev/serial0` (thường trỏ tới `ttyAMA0`); `/dev/serial1` dành cho
-Bluetooth. TX/RX nối chéo với RX2/TX2 của ESP32, chung GND. Nếu Pi dùng tên
-thiết bị khác, đổi `device` trong
+Không cần bật UART GPIO hoặc `dtoverlay=miniuart-bt`. Cáp Type-C data từ ESP32
+được CP210x tạo thành `/dev/ttyUSB0`. Nếu tên thiết bị khác, đổi `device` trong
 `src/exo_gateway/config/safety.yaml`. Không nối trực tiếp mức điện áp 5 V vào
-ESP32; xác nhận pin UART và mức 3.3 V trên đúng board.
+GPIO ESP32.
 
-Chuẩn UART cố định: 115200 baud, 8 data bits, no parity, 1 stop bit (8N1),
-Pi TX nối ESP32 RX2 GPIO16, Pi RX nối ESP32 TX2 GPIO17, và chung GND. Trên
-ESP32 đây là HardwareSerial(2). Trên Pi, device /dev/serial0 là UART GPIO
-sau overlay hiện tại; không dùng /dev/serial1 nếu nó đang dành cho Bluetooth.
+Chuẩn USB serial cố định: 115200 baud, 8 data bits, no parity, 1 stop bit
+(8N1). ESP32 dùng cổng `Serial` qua CP210x; Pi dùng `/dev/ttyUSB0`.
 
 ESP32 gửi định kỳ device_status gồm battery_voltage, battery_percent,
 estop_active, command_watchdog_ok, fault_reason; Pi chuyển tiếp các trường
 này qua BLE để Mobile đọc. Mạch đo pin phải là 56 kOhm phía pin và 10 kOhm
 xuống GND, không đưa điện áp pin trực tiếp vào ESP32.
+
+Trong thời gian tập, ESP32 cũng gửi `exercise_status` định kỳ gồm bài tập hiện tại,
+set/lần đã hoàn thành, tổng số lần, target, elapsed time, active time và thời lượng
+lần gần nhất. `elapsed_ms` gồm cả thời gian tạm dừng; `active_ms` chỉ tính thời gian
+thiết bị thực sự chạy. Mobile dùng dữ liệu này để hiển thị tiến độ trực tiếp và đồng
+bộ thống kê hoàn thành lên server. Bản commissioning hiện mô phỏng nhịp chuyển động
+bằng timer; không coi đó là dữ liệu vận động thật cho đến khi encoder/actuator được
+kiểm thử và bật trong safety configuration.
 
 ### Kiểm tra flow chọn bài và trạng thái
 
@@ -102,7 +106,7 @@ xuống GND, không đưa điện áp pin trực tiếp vào ESP32.
 
 Mobile prepare_exercise -> BLE Pi -> /exo/exercise/prepare -> SafetyGateway
 lưu session -> Mobile exercise_command(start) -> /exo/exercise/request ->
-/exo/exercise/accepted -> UART Pi -> ESP32 UART2.
+/exo/exercise/accepted -> USB serial Pi -> ESP32 Serial.
 
 ESP32 xác nhận bằng exercise_status; UART bridge đưa lên
 /exo/exercise/status; BLE bridge đưa tiếp cho Mobile. Khi bấm GPIO13/GPIO4,
@@ -134,12 +138,12 @@ ros2 topic echo /exo/exercise/status
 ros2 topic hz /exo/state
 ```
 
-Log trực tiếp của `uart_bridge` có các dòng `Connected ESP32 UART`, `UART TX`
+Log trực tiếp của `uart_bridge` có các dòng `Connected ESP32 USB serial`, `UART TX`
 và `UART RX`. Nếu thấy `UART unavailable`, kiểm tra:
 
 ```bash
-ls -l /dev/serial1 /dev/ttyAMA* /dev/ttyS* 2>/dev/null
-sudo fuser -v /dev/serial0
+ls -l /dev/ttyUSB* /dev/serial/by-id/* 2>/dev/null
+sudo fuser -v /dev/ttyUSB0
 ```
 
 Nếu chỉ muốn test ROS + UART khi Bluetooth chưa cấu hình xong:

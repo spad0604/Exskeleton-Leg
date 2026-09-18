@@ -73,7 +73,114 @@ public class PatientDataService {
     }
 
     public List<Map<String, Object>> plans(UUID patientId, String scope) { ensurePatient(patientId); var sql = "all".equals(scope) ? "select p.*, e.id exercise_id, e.code exercise_code, e.name exercise_name, e.category exercise_category, e.name_key, e.description_key, e.instructions_key, e.safety_key, e.difficulty, e.requires_support, e.image_asset from patient_plan_items p join exercises e on e.id=p.exercise_id where p.patient_id=? and e.active=true order by p.plan_date desc, p.id" : "select p.*, e.id exercise_id, e.code exercise_code, e.name exercise_name, e.category exercise_category, e.name_key, e.description_key, e.instructions_key, e.safety_key, e.difficulty, e.requires_support, e.image_asset from patient_plan_items p join exercises e on e.id=p.exercise_id where p.patient_id=? and p.plan_date=? and e.active=true order by p.id"; var args = "all".equals(scope) ? new Object[] {patientId} : new Object[] {patientId, Date.valueOf(LocalDate.now())}; return jdbc.queryForList(sql, args).stream().map(this::planOutput).toList(); }
-    public Map<String, Object> progress(UUID patientId, String period) { ensurePatient(patientId); var days = "month".equals(period) ? 30 : 7; var start = LocalDate.now().minusDays(days - 1L); var row=jdbc.queryForMap("select count(*) planned_count, coalesce(sum(case when status='completed' then 1 else 0 end),0) completed_count from patient_plan_items where patient_id=? and plan_date >= ?", patientId, Date.valueOf(start)); var startTimestamp = Timestamp.from(start.atStartOfDay().toInstant(java.time.ZoneOffset.UTC)); var s=jdbc.queryForMap("select coalesce(sum(active_seconds),0) active_seconds, avg(correctness_ratio) correctness_ratio from training_sessions where patient_id=? and started_at >= ?", patientId, startTimestamp); var history=jdbc.queryForList("select id, started_at, completed_at, active_seconds, correctness_ratio, status from training_sessions where patient_id=? and started_at >= ? order by started_at desc limit 20", patientId, startTimestamp); return Map.of("period", period, "planned_count", row.get("planned_count"), "completed_count", row.get("completed_count"), "active_seconds", s.get("active_seconds"), "correctness_ratio", s.get("correctness_ratio") == null ? 0 : s.get("correctness_ratio"), "warning_count", 0, "critical_count", 0, "streak_days", 0, "recent_sessions", history); }
+    public Map<String, Object> progress(UUID patientId, String period) {
+        ensurePatient(patientId);
+        var days = "day".equals(period) ? 1 : ("month".equals(period) ? 30 : 7);
+        var start = LocalDate.now().minusDays(days - 1L);
+        var row = jdbc.queryForMap(
+                "select count(*) planned_count, coalesce(sum(case when status='completed' then 1 else 0 end),0) completed_count from patient_plan_items where patient_id=? and plan_date >= ? and plan_date <= ?",
+                patientId, Date.valueOf(start), Date.valueOf(LocalDate.now()));
+        var startTimestamp = Timestamp.from(start.atStartOfDay().toInstant(java.time.ZoneOffset.UTC));
+        var sessions = jdbc.queryForMap(
+                "select count(*) session_count, coalesce(sum(active_seconds),0) active_seconds, coalesce(sum(completed_repetitions),0) total_repetitions, avg(correctness_ratio) correctness_ratio from training_sessions where patient_id=? and status='completed' and started_at >= ?",
+                patientId, startTimestamp);
+        var history = jdbc.queryForList(
+                "select id, plan_item_id, exercise_code, started_at, completed_at, active_seconds, correctness_ratio, completed_repetitions, status from training_sessions where patient_id=? and started_at >= ? order by started_at desc limit 20",
+                patientId, startTimestamp);
+        var alertCounts = jdbc.queryForMap(
+                "select coalesce(sum(case when severity='warning' then 1 else 0 end),0) warning_count, coalesce(sum(case when severity='critical' then 1 else 0 end),0) critical_count from patient_alerts where patient_id=? and occurred_at >= ?",
+                patientId, startTimestamp);
+        var completedDays = jdbc.queryForList(
+                "select distinct plan_date from patient_plan_items where patient_id=? and status='completed' and plan_date between ? and ? order by plan_date desc",
+                Date.class, patientId, Date.valueOf(start), Date.valueOf(LocalDate.now()));
+        var streak = 0;
+        var day = LocalDate.now();
+        for (var completedDay : completedDays) {
+            if (!completedDay.toLocalDate().equals(day)) break;
+            streak++;
+            day = day.minusDays(1);
+        }
+        var dailyRows = jdbc.queryForList(
+                "select cast(started_at as date) activity_date, count(*) session_count, coalesce(sum(active_seconds),0) active_seconds, coalesce(sum(completed_repetitions),0) repetitions from training_sessions where patient_id=? and status='completed' and started_at >= ? group by cast(started_at as date) order by activity_date",
+                patientId, startTimestamp);
+        var dailyByDate = new LinkedHashMap<LocalDate, Map<String, Object>>();
+        for (var daily : dailyRows) {
+            var value = daily.get("activity_date");
+            var date = value instanceof Date sqlDate ? sqlDate.toLocalDate() : LocalDate.parse(value.toString());
+            dailyByDate.put(date, Map.of(
+                    "date", date.toString(),
+                    "session_count", daily.get("session_count"),
+                    "active_seconds", daily.get("active_seconds"),
+                    "repetitions", daily.get("repetitions")));
+        }
+        var daily = new ArrayList<Map<String, Object>>();
+        for (var offset = 0; offset < days; offset++) {
+            var date = start.plusDays(offset);
+            daily.add(dailyByDate.getOrDefault(date, Map.of(
+                    "date", date.toString(), "session_count", 0,
+                    "active_seconds", 0, "repetitions", 0)));
+        }
+        var byExercise = jdbc.queryForList(
+                "select exercise_code, count(*) session_count, coalesce(sum(completed_repetitions),0) repetitions, coalesce(sum(active_seconds),0) active_seconds from training_sessions where patient_id=? and status='completed' and started_at >= ? group by exercise_code order by repetitions desc, active_seconds desc limit 5",
+                patientId, startTimestamp);
+        var completed = ((Number) row.get("completed_count")).intValue();
+        var planned = ((Number) row.get("planned_count")).intValue();
+        var completionRate = planned == 0 ? 0.0 : (double) completed / planned;
+        var insight = completed == 0
+                ? "Hôm nay là một khởi đầu tốt — hãy hoàn thành phiên đầu tiên của bạn."
+                : streak >= 3
+                    ? "Bạn đang giữ nhịp rất tốt. Tiếp tục thêm một phiên ngắn để duy trì streak."
+                    : "Mỗi phiên đều được ghi nhận. Một phiên ngắn hôm nay cũng tạo khác biệt.";
+        var output = new LinkedHashMap<String, Object>();
+        output.put("period", period);
+        output.put("from", start.toString());
+        output.put("to", LocalDate.now().toString());
+        output.put("planned_count", planned);
+        output.put("completed_count", completed);
+        output.put("completion_rate", completionRate);
+        output.put("session_count", sessions.get("session_count"));
+        output.put("active_seconds", sessions.get("active_seconds"));
+        output.put("total_repetitions", sessions.get("total_repetitions"));
+        output.put("correctness_ratio", sessions.get("correctness_ratio") == null ? 0 : sessions.get("correctness_ratio"));
+        output.put("warning_count", alertCounts.get("warning_count"));
+        output.put("critical_count", alertCounts.get("critical_count"));
+        output.put("streak_days", streak);
+        output.put("insight", insight);
+        output.put("daily", daily);
+        output.put("by_exercise", byExercise);
+        output.put("recent_sessions", history);
+        return output;
+    }
+
+    @Transactional
+    public Map<String, Object> completeSession(UUID patientId,
+            PatientSystemController.CompletionRequest request) {
+        ensurePatient(patientId);
+        if (request.sessionId() == null || request.planItemId() == null
+                || request.exerciseCode() == null || request.exerciseCode().isBlank()) {
+            throw new IllegalArgumentException("sessionId, planItemId and exerciseCode are required");
+        }
+        if (request.completedRepetitions() < 0 || request.activeSeconds() < 0
+                || request.correctnessRatio() < 0 || request.correctnessRatio() > 1) {
+            throw new IllegalArgumentException("invalid completion metrics");
+        }
+        var plan = jdbc.queryForMap(
+                "select id, exercise_id, sets, repetitions_per_set from patient_plan_items where id=? and patient_id=?",
+                request.planItemId(), patientId);
+        var now = Timestamp.from(Instant.now());
+        var updated = jdbc.update("update training_sessions set completed_at=?, active_seconds=?, correctness_ratio=?, completed_repetitions=?, exercise_code=?, status='completed' where id=? and patient_id=?",
+                now, request.activeSeconds(), request.correctnessRatio(), request.completedRepetitions(), request.exerciseCode(),
+                request.sessionId(), patientId);
+        if (updated == 0) {
+            jdbc.update("insert into training_sessions (id, patient_id, plan_item_id, started_at, completed_at, active_seconds, correctness_ratio, status, completed_repetitions, exercise_code) values (?, ?, ?, ?, ?, ?, ?, 'completed', ?, ?)",
+                    request.sessionId(), patientId, plan.get("id"), now, now, request.activeSeconds(),
+                    request.correctnessRatio(), request.completedRepetitions(), request.exerciseCode());
+        }
+        jdbc.update("update patient_plan_items set status='completed', completed_at=? where id=? and patient_id=?",
+                now, request.planItemId(), patientId);
+        return Map.of("session_id", request.sessionId(), "plan_item_id", request.planItemId(),
+                "status", "completed", "completed_repetitions", request.completedRepetitions());
+    }
     public List<Map<String, Object>> devices(UUID patientId) { ensurePatient(patientId); return jdbc.queryForList("select * from patient_devices where patient_id=?", patientId).stream().map(this::deviceOutput).toList(); }
     public List<Map<String, Object>> exercises() { return jdbc.queryForList("select * from exercises where active=true order by category, code").stream().map(this::exerciseOutput).toList(); }
     public Map<String, Object> exercise(UUID exerciseId) { return exerciseOutput(jdbc.queryForMap("select * from exercises where id=? and active=true", exerciseId)); }

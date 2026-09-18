@@ -69,6 +69,29 @@ class NetworkDataSource {
     return _data(response.data);
   }
 
+  Future<Map<String, dynamic>> completeTrainingSession({
+    required String patientId,
+    required String sessionId,
+    required String planItemId,
+    required String exerciseCode,
+    required int completedRepetitions,
+    required int activeSeconds,
+    double correctnessRatio = 1,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'patients/$patientId/training-sessions/complete',
+      data: {
+        'session_id': sessionId,
+        'plan_item_id': planItemId,
+        'exercise_code': exerciseCode,
+        'completed_repetitions': completedRepetitions,
+        'active_seconds': activeSeconds,
+        'correctness_ratio': correctnessRatio,
+      },
+    );
+    return _data(response.data);
+  }
+
   Future<List<Map<String, dynamic>>> getDevices(String patientId) async {
     final response = await _dio.get<Map<String, dynamic>>(
       'devices',

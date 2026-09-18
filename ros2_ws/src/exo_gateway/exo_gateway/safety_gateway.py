@@ -20,6 +20,7 @@ class SafetyGateway(Node):
         self.declare_parameter('command_timeout_sec', 0.5)
         # False until a real, independently fail-safe E-stop input is wired in.
         self.declare_parameter('estop_active', True)
+        self.declare_parameter('exercise_commissioning_mode', False)
         self._last_command_time = None
         self._fault_reason = 'E-stop hardware adapter not configured'
         self._prepared_session_id = None
@@ -50,7 +51,7 @@ class SafetyGateway(Node):
         status = ExerciseStatus()
         status.session_id = exercise.session_id
         status.exercise_code = exercise.exercise_code
-        if self._estop_active():
+        if self._estop_active() and not self._commissioning_mode():
             status.state = 'not_ready'
             status.reason = 'E-stop active or hardware adapter not configured'
         elif exercise.exercise_code not in self._exercise_catalog:
@@ -77,7 +78,7 @@ class SafetyGateway(Node):
             status.reason = ''
             self._exercise_status_pub.publish(status)
             return
-        if self._estop_active():
+        if self._estop_active() and not self._commissioning_mode():
             status.state = 'not_ready'
             status.reason = 'E-stop active or hardware adapter not configured'
         elif command.exercise_code not in self._exercise_catalog:
@@ -110,6 +111,9 @@ class SafetyGateway(Node):
 
     def _estop_active(self):
         return self.get_parameter('estop_active').value
+
+    def _commissioning_mode(self):
+        return self.get_parameter('exercise_commissioning_mode').value
 
     def _on_request(self, command):
         if command.mode == DeviceCommand.MODE_STOP or not command.enable:
