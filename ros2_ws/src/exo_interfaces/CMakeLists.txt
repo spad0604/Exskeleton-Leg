@@ -11,6 +11,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "msg/PrepareExercise.msg"
   "msg/ExerciseStatus.msg"
   "msg/ExerciseCommand.msg"
+  "msg/ImuSample.msg"
+  "msg/FallAlert.msg"
   DEPENDENCIES std_msgs
 )
 

@@ -6,6 +6,7 @@ class RegisterParams {
   final String timezone;
   final String acceptedTermsVersion;
   final String? deviceLabel;
+  final String role;
 
   const RegisterParams({
     required this.email,
@@ -15,6 +16,7 @@ class RegisterParams {
     this.timezone = 'Asia/Ho_Chi_Minh',
     this.acceptedTermsVersion = '2026-01',
     this.deviceLabel,
+    this.role = 'patient',
   });
 
   Map<String, dynamic> toJson() => {
@@ -25,5 +27,6 @@ class RegisterParams {
     'timezone': timezone,
     'accepted_terms_version': acceptedTermsVersion,
     if (deviceLabel != null) 'device_label': deviceLabel,
+    'role': role,
   };
 }

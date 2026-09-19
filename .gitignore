@@ -85,3 +85,11 @@ __pycache__/
 tmp/
 temp/
 *.tmp
+# Firebase Admin credentials must stay outside source control.
+leg/src/main/resources/firebase_admin.json
+leg/firebase_admin.json
+
+sis_fall_har_and_fall-detection_trainning-main/SisFall_dataset_Windowed
+sis_fall_har_and_fall-detection_trainning-main/SisFall_dataset_Processed
+SisFall_dataset_Windowed.zip
+sis_fall_har_and_fall-detection_trainning-main/archive

@@ -32,6 +32,7 @@ class _RegisterPageState extends State<RegisterPage> {
   final _passwordController = TextEditingController();
   bool _acceptedTerms = false;
   bool _obscurePassword = true;
+  String _role = 'patient';
 
   @override
   void dispose() {
@@ -56,6 +57,7 @@ class _RegisterPageState extends State<RegisterPage> {
           email: _emailController.text,
           password: _passwordController.text,
           acceptedTerms: _acceptedTerms,
+          role: _role,
         );
   }
 
@@ -81,7 +83,10 @@ class _RegisterPageState extends State<RegisterPage> {
           authBloc.add(AuthLoggedIn(state.account!));
           await authenticated;
           if (!context.mounted) return;
-          context.router.replaceAll([const PatientShellRoute()]);
+          final caregiver = state.account!.roles.contains('caregiver');
+          context.router.replaceAll([
+            caregiver ? const CaregiverShellRoute() : const PatientShellRoute()
+          ]);
         } else if (state.status == RegisterStatus.failure) {
           final message = state.error?.message;
           if (message != null) {
@@ -102,18 +107,10 @@ class _RegisterPageState extends State<RegisterPage> {
                 constraints: const BoxConstraints(maxWidth: 480),
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: Theme.of(context).colorScheme.surface,
                     borderRadius: BorderRadius.circular(28),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context)
-                            .colorScheme
-                            .shadow
-                            .withValues(alpha: 0.05),
-                        offset: const Offset(0, 18),
-                        blurRadius: 44,
-                      ),
-                    ],
+                    border: Border.all(
+                        color: Theme.of(context).colorScheme.outlineVariant),
                   ),
                   child: Padding(
                     padding: const EdgeInsets.all(24),
@@ -124,6 +121,8 @@ class _RegisterPageState extends State<RegisterPage> {
                         children: [
                           AuthHeader(
                             icon: Icons.health_and_safety_outlined,
+                            assetPath:
+                                'assets/images/gen_assets/asset_training_plan.png',
                             title: LocaleKeys.Auth_Register_Title.tr(),
                             subtitle: LocaleKeys.Auth_Register_Subtitle.tr(),
                           ),
@@ -140,6 +139,11 @@ class _RegisterPageState extends State<RegisterPage> {
                                     2
                                 ? LocaleKeys.Auth_Register_FullNameRequired.tr()
                                 : null,
+                          ),
+                          const SizedBox(height: 18),
+                          _RoleChoiceCard(
+                            role: _role,
+                            onChanged: (value) => setState(() => _role = value),
                           ),
                           const SizedBox(height: 18),
                           AuthTextFormField(
@@ -192,14 +196,17 @@ class _RegisterPageState extends State<RegisterPage> {
                             onFieldSubmitted: (_) => _submit(),
                           ),
                           const SizedBox(height: 12),
-                          CheckboxListTile(
-                            contentPadding: EdgeInsets.zero,
-                            controlAffinity: ListTileControlAffinity.leading,
-                            value: _acceptedTerms,
-                            onChanged: (value) => setState(() {
-                              _acceptedTerms = value ?? false;
-                            }),
-                            title: Text(LocaleKeys.Auth_Register_Terms.tr()),
+                          Material(
+                            color: Colors.transparent,
+                            child: CheckboxListTile(
+                              contentPadding: EdgeInsets.zero,
+                              controlAffinity: ListTileControlAffinity.leading,
+                              value: _acceptedTerms,
+                              onChanged: (value) => setState(() {
+                                _acceptedTerms = value ?? false;
+                              }),
+                              title: Text(LocaleKeys.Auth_Register_Terms.tr()),
+                            ),
                           ),
                           const SizedBox(height: 16),
                           BlocBuilder<RegisterCubit, RegisterState>(
@@ -239,6 +246,107 @@ class _RegisterPageState extends State<RegisterPage> {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _RoleChoiceCard extends StatelessWidget {
+  final String role;
+  final ValueChanged<String> onChanged;
+
+  const _RoleChoiceCard({required this.role, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Bạn sử dụng Exoskeleton Leg với vai trò',
+            style: Theme.of(context).textTheme.labelLarge),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+                child: _RoleOption(
+              selected: role == 'patient',
+              icon: Icons.directions_walk_rounded,
+              title: 'Người tập',
+              subtitle: 'Tập và theo dõi cơ thể',
+              onTap: () => onChanged('patient'),
+              scheme: scheme,
+            )),
+            const SizedBox(width: 10),
+            Expanded(
+                child: _RoleOption(
+              selected: role == 'caregiver',
+              icon: Icons.shield_outlined,
+              title: 'Giám sát',
+              subtitle: 'Theo dõi người tập',
+              onTap: () => onChanged('caregiver'),
+              scheme: scheme,
+            )),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _RoleOption extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final ColorScheme scheme;
+
+  const _RoleOption({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    required this.scheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: SizedBox(
+        height: 142,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          width: double.infinity,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: selected ? scheme.primaryContainer : scheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+                color: selected ? scheme.primary : scheme.outlineVariant,
+                width: selected ? 1.5 : 1),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon,
+                  color: selected ? scheme.primary : scheme.onSurfaceVariant),
+              const SizedBox(height: 10),
+              Text(title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w800)),
+              const SizedBox(height: 3),
+              Text(subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall),
+            ],
           ),
         ),
       ),

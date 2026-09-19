@@ -53,7 +53,8 @@ class _SplashPageState extends State<SplashPage> {
     authBloc.add(AuthLoggedIn(account));
     await authenticated;
     if (!context.mounted) return;
-    context.router.replaceAll([const PatientShellRoute()]);
+    final caregiver = account.roles.contains('caregiver');
+    context.router.replaceAll([caregiver ? const CaregiverShellRoute() : const PatientShellRoute()]);
   }
 
   void _onError(BuildContext context, SplashState state) {

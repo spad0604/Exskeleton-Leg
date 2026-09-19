@@ -59,6 +59,7 @@ class _FakeAuthRepository implements AuthRepository {
     required String password,
     required String displayName,
     required bool acceptedTerms,
+    String role = 'patient',
   }) async {
     registerCalls += 1;
     return Account(

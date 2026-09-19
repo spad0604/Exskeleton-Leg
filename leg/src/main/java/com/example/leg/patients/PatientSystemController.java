@@ -23,16 +23,20 @@ import org.springframework.web.bind.annotation.RestController;
 public class PatientSystemController {
     private final AuthService authService;
     private final PatientDataService patientData;
+    private final com.example.leg.relationships.RelationshipService relationships;
 
-    public PatientSystemController(AuthService authService, PatientDataService patientData) {
+    public PatientSystemController(AuthService authService, PatientDataService patientData,
+            com.example.leg.relationships.RelationshipService relationships) {
         this.authService = authService;
         this.patientData = patientData;
+        this.relationships = relationships;
     }
 
     @GetMapping("/patients/{patientId}")
     public ApiResponse<Map<String, Object>> patient(@PathVariable UUID patientId,
             @AuthenticationPrincipal AuthenticatedUser principal) {
-        var user = requireSelf(patientId, principal);
+        relationships.requireCanView(principal, patientId);
+        var user = authService.requireUser(patientId);
         return ApiResponse.of(Map.of(
                 "id", user.getId(), "display_name", user.getDisplayName(), "email", user.getEmailNormalized(),
                 "locale", user.getLocale(), "timezone", user.getTimezone(), "version", 1));
@@ -41,7 +45,7 @@ public class PatientSystemController {
     @GetMapping("/patients/{patientId}/plan-items/today")
     public ApiResponse<List<Map<String, Object>>> today(@PathVariable UUID patientId,
             @AuthenticationPrincipal AuthenticatedUser principal) {
-        requireSelf(patientId, principal);
+        relationships.requireCanView(principal, patientId);
         return ApiResponse.of(patientData.plans(patientId, "today"));
 
     }
@@ -67,7 +71,7 @@ public class PatientSystemController {
     public ApiResponse<List<Map<String, Object>>> allPlans(@PathVariable UUID patientId,
             @RequestParam(defaultValue = "all") String scope,
             @AuthenticationPrincipal AuthenticatedUser principal) {
-        requireSelf(patientId, principal);
+        relationships.requireCanView(principal, patientId);
         if (!scope.equals("all") && !scope.equals("today")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation.invalid_scope", "Scope không hợp lệ.");
         }
@@ -78,7 +82,7 @@ public class PatientSystemController {
     public ApiResponse<Map<String, Object>> progress(@PathVariable UUID patientId,
             @RequestParam(defaultValue = "week") String period,
             @AuthenticationPrincipal AuthenticatedUser principal) {
-        requireSelf(patientId, principal);
+        relationships.requireCanView(principal, patientId);
         if (!period.equals("day") && !period.equals("week") && !period.equals("month")) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "validation.invalid_period", "Period không hợp lệ.");
         }
@@ -113,7 +117,7 @@ public class PatientSystemController {
     private com.example.leg.identity.UserEntity requireSelf(UUID patientId, AuthenticatedUser principal) {
         if (principal == null) throw denied();
         var user = authService.requireUser(principal.id());
-        if (!user.getId().equals(patientId)) throw denied();
+        if (!user.getId().equals(patientId) || !principal.roles().contains("patient")) throw denied();
         return user;
     }
 

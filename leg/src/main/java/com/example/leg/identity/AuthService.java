@@ -58,7 +58,7 @@ public class AuthService {
         user.setLocale(locale);
         user.setTimezone(timezone);
         user.setAcceptedTermsVersion(terms);
-        user.setRoles(new HashSet<>(Set.of("patient")));
+        user.setRoles(new HashSet<>(Set.of(registerRole(request.role()))));
         try {
             users.saveAndFlush(user);
         } catch (DataIntegrityViolationException exception) {
@@ -195,6 +195,14 @@ public class AuthService {
             throw validation("locale", "Ngôn ngữ chỉ hỗ trợ vi hoặc en.");
         }
         return locale;
+    }
+
+    private String registerRole(String value) {
+        var role = value == null || value.isBlank() ? "patient" : value.trim().toLowerCase();
+        if (!role.equals("patient") && !role.equals("caregiver")) {
+            throw validation("role", "Chỉ có thể đăng ký vai trò người tập hoặc người giám sát.");
+        }
+        return role;
     }
 
     private void ensureActive(UserEntity user) {

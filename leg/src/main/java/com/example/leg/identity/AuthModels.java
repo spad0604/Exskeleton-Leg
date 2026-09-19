@@ -15,7 +15,8 @@ public final class AuthModels {
             String locale,
             @NotBlank String timezone,
             @NotBlank String acceptedTermsVersion,
-            String deviceLabel) {
+            String deviceLabel,
+            String role) {
     }
 
     public record LoginRequest(@NotBlank String email, @NotBlank String password, String deviceLabel) {

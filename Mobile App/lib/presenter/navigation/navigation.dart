@@ -4,6 +4,7 @@ import 'package:flutter_starter/presenter/pages/home/home.dart';
 import 'package:flutter_starter/presenter/pages/login/login.dart';
 import 'package:flutter_starter/presenter/pages/patient/patient_placeholders.dart';
 import 'package:flutter_starter/presenter/pages/patient/patient_shell.dart';
+import 'package:flutter_starter/presenter/pages/caregiver/caregiver_shell.dart';
 import 'package:flutter_starter/presenter/pages/register/register.dart';
 import 'package:flutter_starter/presenter/pages/splash/splash.dart';
 import 'package:injectable/injectable.dart';
@@ -22,6 +23,7 @@ class AppRouter extends RootStackRouter {
     AutoRoute(path: '/', page: SplashRoute.page),
     AutoRoute(path: '/auth/login', page: LoginRoute.page),
     AutoRoute(path: '/auth/register', page: RegisterRoute.page),
+    AutoRoute(path: '/caregiver', page: CaregiverShellRoute.page),
     AutoRoute(
       path: '/patient',
       page: PatientShellRoute.page,
@@ -42,6 +44,7 @@ class AppRouter extends RootStackRouter {
   bool isAuthorizedRoute(String routeName) =>
       [
         PatientShellRoute.name,
+        CaregiverShellRoute.name,
         HomeRoute.name,
         TrainingRoute.name,
         ProgressRoute.name,

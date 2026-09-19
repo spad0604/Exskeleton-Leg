@@ -18,4 +18,6 @@ def generate_launch_description():
              condition=IfCondition(LaunchConfiguration('enable_ble'))),
         Node(package='exo_gateway', executable='uart_bridge', name='uart_bridge', output='screen',
              parameters=[config]),
+        Node(package='exo_gateway', executable='fall_detector', name='fall_detector', output='screen',
+             parameters=[config]),
     ])

@@ -12,5 +12,15 @@ uart_bridge:
   ros__parameters:
     # ESP32 USB Type-C CP210x adapter. The Pi exposes it as ttyUSB0.
     device: /dev/ttyUSB0
-    baudrate: 115200
+    baudrate: 921600
     reconnect_sec: 2.0
+
+fall_detector:
+  ros__parameters:
+    model_path: /home/robot/exo_fall_detector_v4.tflite
+    device_id: exo-leg-1
+    window_size: 200
+    inference_stride: 50
+    fall_threshold: 0.80
+    confirm_windows: 2
+    alert_cooldown_sec: 10.0

@@ -11,6 +11,22 @@
 part of 'navigation.dart';
 
 /// generated route for
+/// [CaregiverShellPage]
+class CaregiverShellRoute extends PageRouteInfo<void> {
+  const CaregiverShellRoute({List<PageRouteInfo>? children})
+    : super(CaregiverShellRoute.name, initialChildren: children);
+
+  static const String name = 'CaregiverShellRoute';
+
+  static PageInfo page = PageInfo(
+    name,
+    builder: (data) {
+      return const CaregiverShellPage();
+    },
+  );
+}
+
+/// generated route for
 /// [DevicePage]
 class DeviceRoute extends PageRouteInfo<void> {
   const DeviceRoute({List<PageRouteInfo>? children})

@@ -92,6 +92,40 @@ class LiveDeviceStatus {
       );
 }
 
+class FallAlert {
+  final String alertId;
+  final String deviceId;
+  final int predictedClass;
+  final String predictedLabel;
+  final double fallProbability;
+  final int consecutiveFallWindows;
+  final bool confirmed;
+  final int? timestampMs;
+
+  const FallAlert({
+    required this.alertId,
+    required this.deviceId,
+    required this.predictedClass,
+    required this.predictedLabel,
+    required this.fallProbability,
+    required this.consecutiveFallWindows,
+    required this.confirmed,
+    this.timestampMs,
+  });
+
+  factory FallAlert.fromJson(Map<String, dynamic> json) => FallAlert(
+        alertId: json['alert_id']?.toString() ?? '',
+        deviceId: json['device_id']?.toString() ?? '',
+        predictedClass: (json['predicted_class'] as num?)?.toInt() ?? 3,
+        predictedLabel: json['predicted_label']?.toString() ?? 'Fall',
+        fallProbability: (json['fall_probability'] as num?)?.toDouble() ?? 0,
+        consecutiveFallWindows:
+            (json['consecutive_fall_windows'] as num?)?.toInt() ?? 0,
+        confirmed: json['confirmed'] == true,
+        timestampMs: (json['timestamp_ms'] as num?)?.toInt(),
+      );
+}
+
 Map<String, dynamic> decodeBleStatus(List<int> bytes) {
   final json = jsonDecode(utf8.decode(bytes)) as Map<String, dynamic>;
   if (json['v'] != ExoBleProtocol.protocolVersion) {

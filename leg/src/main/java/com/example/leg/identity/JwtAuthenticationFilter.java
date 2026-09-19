@@ -19,10 +19,12 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtService jwtService;
     private final ObjectMapper objectMapper;
+    private final UserRepository users;
 
-    public JwtAuthenticationFilter(JwtService jwtService, ObjectMapper objectMapper) {
+    public JwtAuthenticationFilter(JwtService jwtService, ObjectMapper objectMapper, UserRepository users) {
         this.jwtService = jwtService;
         this.objectMapper = objectMapper;
+        this.users = users;
     }
 
     @Override
@@ -34,7 +36,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     && header.startsWith("Bearer ")
                     && SecurityContextHolder.getContext().getAuthentication() == null) {
                 var userId = jwtService.validateAccessToken(header.substring("Bearer ".length()));
-                var principal = new AuthenticatedUser(userId, List.of());
+                var user = users.findWithRolesById(userId)
+                        .orElseThrow(() -> new ApiException(org.springframework.http.HttpStatus.UNAUTHORIZED,
+                                "auth.invalid_token", "Phiên đăng nhập không hợp lệ hoặc đã hết hạn."));
+                var principal = new AuthenticatedUser(userId, user.getRoles().stream().sorted().toList());
                 var auth = new UsernamePasswordAuthenticationToken(principal, null, principal.getAuthorities());
                 SecurityContextHolder.getContext().setAuthentication(auth);
             }

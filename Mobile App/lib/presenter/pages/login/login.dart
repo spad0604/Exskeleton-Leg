@@ -58,7 +58,9 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _onSuccess(BuildContext context, LoginState state) {
-    context.router.replaceAll([const PatientShellRoute()]);
+    final caregiver = state.account?.roles.contains('caregiver') ?? false;
+    context.router.replaceAll(
+        [caregiver ? const CaregiverShellRoute() : const PatientShellRoute()]);
   }
 
   void _onError(BuildContext context, LoginState state) {
@@ -94,18 +96,11 @@ class _LoginPageState extends State<LoginPage> {
                     key: _formKey,
                     child: DecoratedBox(
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(28),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Theme.of(context)
-                                .colorScheme
-                                .shadow
-                                .withValues(alpha: 0.05),
-                            offset: const Offset(0, 18),
-                            blurRadius: 44,
-                          ),
-                        ],
+                        border: Border.all(
+                            color:
+                                Theme.of(context).colorScheme.outlineVariant),
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(24),
@@ -124,6 +119,8 @@ class _LoginPageState extends State<LoginPage> {
                             const SizedBox(height: 16),
                             AuthHeader(
                               icon: Icons.accessibility_new_rounded,
+                              assetPath:
+                                  'assets/images/gen_assets/asset_patient_profile_card.png',
                               title: LocaleKeys.Auth_Login_Title.tr(),
                               subtitle: LocaleKeys.Auth_Login_Subtitle.tr(),
                             ),

@@ -6,12 +6,14 @@ class AuthHeader extends StatelessWidget {
   final IconData icon;
   final String title;
   final String subtitle;
+  final String? assetPath;
 
   const AuthHeader({
     super.key,
     required this.icon,
     required this.title,
     required this.subtitle,
+    this.assetPath,
   });
 
   @override
@@ -30,12 +32,15 @@ class AuthHeader extends StatelessWidget {
               color: colorScheme.primaryContainer,
               borderRadius: BorderRadius.circular(22),
             ),
-            child: Icon(
-              icon,
-              size: 34,
-              color: colorScheme.onPrimaryContainer,
-              semanticLabel: title,
-            ),
+            child: assetPath == null
+                ? Icon(icon,
+                    size: 34,
+                    color: colorScheme.onPrimaryContainer,
+                    semanticLabel: title)
+                : Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Image.asset(assetPath!, fit: BoxFit.contain),
+                  ),
           ),
         ),
         const SizedBox(height: 24),

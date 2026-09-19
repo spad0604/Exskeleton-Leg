@@ -41,6 +41,7 @@ class DefaultAuthRepository extends AuthRepository {
     required String password,
     required String displayName,
     required bool acceptedTerms,
+    String role = 'patient',
   }) async {
     if (!acceptedTerms) throw TermsNotAcceptedException();
     try {
@@ -49,6 +50,7 @@ class DefaultAuthRepository extends AuthRepository {
           email: email.trim().toLowerCase(),
           password: password,
           displayName: displayName.trim(),
+          role: role,
         ),
       );
     } on ApiException catch (error) {

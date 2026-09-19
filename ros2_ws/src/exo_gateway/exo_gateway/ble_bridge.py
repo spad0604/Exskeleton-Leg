@@ -5,15 +5,18 @@ approve the selected exercise and every subsequent actuator request.
 """
 
 import asyncio
+import base64
 import json
 import threading
+import time
 
 import rclpy
 from rclpy.executors import MultiThreadedExecutor
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
-from exo_interfaces.msg import DeviceState, ExerciseCommand, ExerciseStatus, PrepareExercise
+from exo_interfaces.msg import DeviceState, ExerciseCommand, ExerciseStatus, FallAlert, PrepareExercise
+from std_msgs.msg import String
 
 # GATT schema v2. A new UUID namespace forces Android to discard the stale
 # cached permissions from the previous bonding experiments.
@@ -27,11 +30,32 @@ class BleBridge(Node):
     def __init__(self, loop):
         super().__init__('ble_bridge')
         self._loop = loop
-        self._status_queue = asyncio.Queue()
+        self._status_queue = asyncio.Queue(maxsize=16)
+        self._last_device_status_at = 0.0
+        self._last_device_status_key = None
+        self._routine_transfers = {}
         self._prepare_pub = self.create_publisher(PrepareExercise, '/exo/exercise/prepare', 10)
         self._exercise_pub = self.create_publisher(ExerciseCommand, '/exo/exercise/request', 10)
+        self._routine_pub = self.create_publisher(String, '/exo/routine/request', 10)
         self.create_subscription(ExerciseStatus, '/exo/exercise/status', self._on_status, 10)
         self.create_subscription(DeviceState, '/exo/state', self._on_device_state, 10)
+        self.create_subscription(FallAlert, '/exo/fall/alert', self._on_fall_alert, 10)
+
+    def _on_fall_alert(self, alert):
+        # Safety events are forwarded immediately and are never rate-limited
+        # like the ordinary device heartbeat.
+        self._queue_status({
+            'v': 1,
+            'type': 'fall_alert',
+            'alert_id': alert.alert_id,
+            'device_id': alert.device_id,
+            'predicted_class': int(alert.predicted_class),
+            'predicted_label': alert.predicted_label,
+            'fall_probability': float(alert.fall_probability),
+            'consecutive_fall_windows': int(alert.consecutive_fall_windows),
+            'confirmed': bool(alert.confirmed),
+            'timestamp_ms': int(time.time() * 1000),
+        })
 
     def _on_status(self, status):
         payload = {
@@ -48,7 +72,7 @@ class BleBridge(Node):
             'total_repetitions': status.total_repetitions,
             'target_total_repetitions': status.target_total_repetitions,
         }
-        self._loop.call_soon_threadsafe(self._status_queue.put_nowait, payload)
+        self._queue_status(payload)
 
     def _on_device_state(self, state):
         state_name = {
@@ -57,16 +81,40 @@ class BleBridge(Node):
             DeviceState.STATE_ASSISTING: 'assisting',
             DeviceState.STATE_FAULT: 'fault',
         }.get(state.state, 'unknown')
-        self._loop.call_soon_threadsafe(self._status_queue.put_nowait, {
+        payload = {
             'v': 1, 'type': 'device_status', 'state': state_name,
             'battery_percent': state.battery_percent,
             'battery_voltage': state.battery_voltage,
             'estop_active': state.estop_active,
             'command_watchdog_ok': state.command_watchdog_ok,
             'fault_reason': state.fault_reason,
-        })
+        }
+        now = time.monotonic()
+        key = (
+            state_name, state.estop_active, state.command_watchdog_ok,
+            round(float(state.battery_percent), 1),
+            round(float(state.battery_voltage), 2), state.fault_reason,
+        )
+        # /exo/state is normally published at 10 Hz. BLE only needs a 1 Hz
+        # heartbeat unless the state actually changed.
+        if key == self._last_device_status_key and now - self._last_device_status_at < 1.0:
+            return
+        self._last_device_status_key = key
+        self._last_device_status_at = now
+        self._queue_status(payload)
+
+    def _queue_status(self, payload):
+        def enqueue():
+            if self._status_queue.full():
+                try:
+                    self._status_queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    pass
+            self._status_queue.put_nowait(payload)
+        self._loop.call_soon_threadsafe(enqueue)
 
     def handle_control(self, raw_value):
+        payload = {}
         try:
             if len(raw_value) > MAX_PAYLOAD_BYTES:
                 raise ValueError('payload too large')
@@ -78,14 +126,97 @@ class BleBridge(Node):
                 self._handle_prepare(payload)
             elif packet_type == 'exercise_command':
                 self._handle_exercise_command(payload)
+            elif packet_type == 'routine_command':
+                self._handle_routine_command(payload)
+            elif packet_type == 'routine_begin':
+                self._handle_routine_begin(payload)
+            elif packet_type == 'routine_chunk':
+                self._handle_routine_chunk(payload)
+            elif packet_type == 'routine_commit':
+                self._handle_routine_commit(payload)
+            elif packet_type == 'routine_control':
+                self._handle_routine_control(payload)
             else:
                 raise ValueError('unsupported BLE packet type')
         except (UnicodeDecodeError, ValueError, TypeError, json.JSONDecodeError) as error:
             self.get_logger().warning(f'Rejected BLE control packet: {error}')
-            self._loop.call_soon_threadsafe(self._status_queue.put_nowait, {
-                'v': 1, 'type': 'exercise_status', 'state': 'rejected', 'reason': str(error),
+            transfer = self._routine_transfers.get(str(payload.get('transfer_id', '')), {})
+            session_id = str(payload.get('session_id') or transfer.get('session_id', ''))[:64]
+            self._queue_status({
+                'v': 1, 'type': 'exercise_status',
+                'session_id': session_id,
+                'exercise_code': 'custom_routine',
+                'state': 'rejected', 'reason': str(error),
                 'completed_repetitions': 0, 'completed_sets': 0,
             })
+
+    def _handle_routine_begin(self, payload):
+        transfer_id = str(payload.get('transfer_id', ''))
+        session_id = str(payload.get('session_id', ''))[:64]
+        total_bytes = int(payload.get('total_bytes', 0))
+        total_chunks = int(payload.get('total_chunks', 0))
+        if not transfer_id or not session_id or not 1 <= total_bytes <= 65536:
+            raise ValueError('invalid routine transfer header')
+        if not 1 <= total_chunks <= 400:
+            raise ValueError('invalid routine chunk count')
+        self._routine_transfers.clear()
+        self._routine_transfers[transfer_id] = {
+            'session_id': session_id, 'total_bytes': total_bytes,
+            'total_chunks': total_chunks, 'chunks': [], 'created_at': time.monotonic(),
+        }
+
+    def _handle_routine_chunk(self, payload):
+        transfer_id = str(payload.get('transfer_id', ''))
+        transfer = self._routine_transfers.get(transfer_id)
+        if transfer is None or time.monotonic() - transfer['created_at'] > 30.0:
+            raise ValueError('routine transfer expired')
+        index = int(payload.get('index', -1))
+        if index != len(transfer['chunks']):
+            raise ValueError('routine chunk is missing or out of order')
+        try:
+            chunk = base64.b64decode(str(payload.get('data', '')), validate=True)
+        except (ValueError, TypeError) as error:
+            raise ValueError('invalid routine chunk encoding') from error
+        if not chunk or len(chunk) > 180:
+            raise ValueError('invalid routine chunk size')
+        transfer['chunks'].append(chunk)
+
+    def _handle_routine_commit(self, payload):
+        transfer_id = str(payload.get('transfer_id', ''))
+        transfer = self._routine_transfers.pop(transfer_id, None)
+        if transfer is None:
+            raise ValueError('unknown routine transfer')
+        if len(transfer['chunks']) != transfer['total_chunks']:
+            raise ValueError('incomplete routine transfer')
+        raw = b''.join(transfer['chunks'])
+        if len(raw) != transfer['total_bytes']:
+            raise ValueError('routine transfer length mismatch')
+        routine = json.loads(raw.decode('utf-8'))
+        if routine.get('v') != 1 or routine.get('session_id') != transfer['session_id']:
+            raise ValueError('routine transfer identity mismatch')
+        self._handle_routine_command(routine)
+
+    def _handle_routine_control(self, payload):
+        if payload.get('action') != 'stop' or not payload.get('session_id'):
+            raise ValueError('invalid routine control')
+        message = String()
+        message.data = json.dumps({
+            'v': 1, 'type': 'routine_command', 'action': 'stop',
+            'session_id': str(payload['session_id'])[:64],
+        }, separators=(',', ':'))
+        self._routine_pub.publish(message)
+
+    def _handle_routine_command(self, payload):
+        if payload.get('action', 'start') == 'stop':
+            return self._handle_routine_control(payload)
+        if not payload.get('routine_id') or not isinstance(payload.get('steps'), list):
+            raise ValueError('invalid routine_command')
+        if not 1 <= int(payload.get('repetitions', 1)) <= 100 or not 1 <= len(payload['steps']) <= 100:
+            raise ValueError('routine target is outside configured limits')
+        message = String()
+        # SafetyGateway performs the authoritative validation before UART TX.
+        message.data = json.dumps(payload, separators=(',', ':'))
+        self._routine_pub.publish(message)
 
     def _handle_prepare(self, payload):
         required = ('session_id', 'plan_item_id', 'exercise_code', 'sets', 'repetitions')
@@ -201,7 +332,10 @@ async def run():
             status = await node._status_queue.get()
             characteristic = server.get_characteristic(STATUS_UUID)
             characteristic.value = bytearray(json.dumps(status, separators=(',', ':')).encode())
-            server.update_value(SERVICE_UUID, STATUS_UUID)
+            try:
+                server.update_value(SERVICE_UUID, STATUS_UUID)
+            except Exception as error:
+                node.get_logger().warning(f'BLE notification update failed: {error}')
     finally:
         await server.stop()
         executor.shutdown()

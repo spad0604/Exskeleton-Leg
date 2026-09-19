@@ -17,6 +17,7 @@ import 'package:flutter_starter/services/cloudinary/cloudinary_upload_service.da
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter_starter/services/ble/exo_ble_service.dart';
 import 'package:flutter_starter/services/ble/exo_ble_protocol.dart';
+import 'package:flutter_starter/presenter/pages/patient/motion_builder.dart';
 
 @RoutePage()
 class TrainingPage extends StatelessWidget {
@@ -77,6 +78,20 @@ class _PlanListViewState extends State<_PlanListView> {
             title: LocaleKeys.Patient_Tabs_Training.tr(),
             children: [
               _TrainingHero(pendingCount: items.length),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton.icon(
+                  onPressed: () => Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (_) => MotionRoutineLibraryPage(
+                        patientId: widget.patientId,
+                      ),
+                    ),
+                  ),
+                  icon: const Icon(Icons.tune),
+                  label: const Text('Bài tập cá nhân'),
+                ),
+              ),
               const SizedBox(height: 16),
               _SegmentHeader(
                   selectedIndex: _selectedIndex,
@@ -1147,31 +1162,32 @@ class _AccountField extends StatelessWidget {
     final colors = _accentColors(Theme.of(context).colorScheme, accent);
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
-      decoration: BoxDecoration(
+      child: Material(
         color: colors.background,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: Theme.of(context).colorScheme.outlineVariant,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+          side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
         ),
-      ),
-      child: ListTile(
-        leading: assetPath == null
-            ? _TintIcon(
-                icon: icon,
-                background: colors.background,
-                foreground: colors.foreground,
-                size: 48)
-            : ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.asset(
-                  assetPath!,
-                  width: 48,
-                  height: 48,
-                  fit: BoxFit.cover,
+        clipBehavior: Clip.antiAlias,
+        child: ListTile(
+          leading: assetPath == null
+              ? _TintIcon(
+                  icon: icon,
+                  background: colors.background,
+                  foreground: colors.foreground,
+                  size: 48)
+              : ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    assetPath!,
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-              ),
-        title: Text(label),
-        subtitle: Text(value),
+          title: Text(label),
+          subtitle: Text(value),
+        ),
       ),
     );
   }
@@ -1262,11 +1278,10 @@ class _ProfilePageState extends State<ProfilePage> {
               assetPath: 'assets/images/gen_assets/asset_phone.png',
               label: LocaleKeys.Patient_Profile_CareNetwork.tr(),
               subtitle: LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
-              onTap: () => _openProfileInfo(
-                  context,
-                  LocaleKeys.Patient_Profile_CareNetwork.tr(),
-                  LocaleKeys.Patient_Profile_CareNetworkSubtitle.tr(),
-                  'assets/images/gen_assets/asset_phone.png'),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                    builder: (_) => const CareNetworkPage()),
+              ),
             ),
           ],
         ),
@@ -1324,6 +1339,210 @@ class _ProfilePageState extends State<ProfilePage> {
         const SizedBox(height: 16),
         const _LogoutButton(),
       ],
+    );
+  }
+}
+
+class CareNetworkPage extends StatefulWidget {
+  const CareNetworkPage({super.key});
+
+  @override
+  State<CareNetworkPage> createState() => _CareNetworkPageState();
+}
+
+class _CareNetworkPageState extends State<CareNetworkPage> {
+  final _emailController = TextEditingController();
+  late Future<List<Map<String, dynamic>>> _relationships;
+
+  @override
+  void initState() {
+    super.initState();
+    _reload();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    super.dispose();
+  }
+
+  void _reload() {
+    _relationships = provider.get<NetworkDataSource>().getRelationships();
+  }
+
+  Future<void> _invite() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) return;
+    try {
+      await provider.get<NetworkDataSource>().inviteRelationship(email);
+      _emailController.clear();
+      if (!mounted) return;
+      setState(_reload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã gửi lời mời liên kết.')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể gửi lời mời: $error')),
+      );
+    }
+  }
+
+  Future<void> _change(String id, String action) async {
+    try {
+      await provider.get<NetworkDataSource>().updateRelationship(id, action);
+      if (mounted) setState(_reload);
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể cập nhật liên kết: $error')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final account = context.read<AuthBloc>().state.account;
+    final isCaregiver = account?.roles.contains('caregiver') ?? false;
+    return Scaffold(
+      appBar: AppBar(title: const Text('Mạng lưới chăm sóc')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            isCaregiver
+                ? 'Thêm người tập để theo dõi an toàn và tiến độ.'
+                : 'Thêm người giám sát để họ nhận được cảnh báo an toàn.',
+            style: Theme.of(context).textTheme.bodyLarge,
+          ),
+          const SizedBox(height: 16),
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surface,
+              borderRadius: BorderRadius.circular(22),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: TextField(
+              controller: _emailController,
+              keyboardType: TextInputType.emailAddress,
+              decoration: InputDecoration(
+                labelText:
+                    isCaregiver ? 'Email người tập' : 'Email người giám sát',
+                hintText: 'name@example.com',
+                prefixIcon: const Icon(Icons.alternate_email_rounded),
+                suffixIcon: IconButton(
+                  onPressed: _invite,
+                  tooltip: 'Gửi lời mời',
+                  icon: const Icon(Icons.person_add_alt_1),
+                ),
+                filled: true,
+                fillColor: Colors.transparent,
+                border: InputBorder.none,
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 18,
+                  vertical: 17,
+                ),
+              ),
+              onSubmitted: (_) => _invite(),
+            ),
+          ),
+          const SizedBox(height: 20),
+          FutureBuilder<List<Map<String, dynamic>>>(
+            future: _relationships,
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(child: CircularProgressIndicator());
+              }
+              final links = snapshot.data ?? const <Map<String, dynamic>>[];
+              if (links.isEmpty) {
+                return const Padding(
+                  padding: EdgeInsets.only(top: 32),
+                  child: Center(child: Text('Chưa có liên kết nào.')),
+                );
+              }
+              return Column(
+                children: links.map((link) {
+                  final status = link['status']?.toString() ?? '';
+                  final otherName = isCaregiver
+                      ? link['patient_name']?.toString()
+                      : link['caregiver_name']?.toString();
+                  final otherEmail = isCaregiver
+                      ? link['patient_email']?.toString()
+                      : link['caregiver_email']?.toString();
+                  final id = link['id']?.toString();
+                  final requestedBy = link['requested_by']?.toString();
+                  final isIncoming =
+                      requestedBy != null && requestedBy != account?.id;
+                  final statusLabel = switch (status) {
+                    'pending' => isIncoming
+                        ? 'Đang chờ bạn xác nhận'
+                        : 'Đã gửi — chờ xác nhận',
+                    'active' => 'Đang hoạt động',
+                    'rejected' => 'Đã từ chối',
+                    'revoked' => 'Đã hủy liên kết',
+                    _ => status,
+                  };
+                  return Material(
+                    color: Theme.of(context).colorScheme.surface,
+                    elevation: 0,
+                    clipBehavior: Clip.antiAlias,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(22),
+                      side: BorderSide(
+                        color: Theme.of(context).colorScheme.outlineVariant,
+                      ),
+                    ),
+                    child: ListTile(
+                      leading: const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(otherName ?? 'Tài khoản liên kết'),
+                      subtitle: Text('$otherEmail\n$statusLabel'),
+                      isThreeLine: true,
+                      trailing: id == null
+                          ? null
+                          : status == 'pending' && isIncoming
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    IconButton(
+                                      tooltip: 'Từ chối',
+                                      icon: const Icon(Icons.close_rounded),
+                                      onPressed: () => _change(id, 'reject'),
+                                    ),
+                                    IconButton(
+                                      tooltip: 'Chấp nhận',
+                                      color:
+                                          Theme.of(context).colorScheme.primary,
+                                      icon: const Icon(
+                                          Icons.check_circle_outline),
+                                      onPressed: () => _change(id, 'accept'),
+                                    ),
+                                  ],
+                                )
+                              : status == 'pending'
+                                  ? IconButton(
+                                      tooltip: 'Hủy lời mời',
+                                      icon: const Icon(Icons.cancel_outlined),
+                                      onPressed: () => _change(id, 'revoke'),
+                                    )
+                                  : status == 'active'
+                                      ? IconButton(
+                                          tooltip: 'Hủy liên kết',
+                                          icon: const Icon(Icons.link_off),
+                                          onPressed: () =>
+                                              _change(id, 'revoke'),
+                                        )
+                                      : null,
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
+      ),
     );
   }
 }
@@ -1854,6 +2073,7 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
   ExerciseDeviceStatus? _liveExercise;
   bool _preparing = false;
   bool _starting = false;
+  bool _stopping = false;
   bool _completionSent = false;
   StreamSubscription<ExerciseDeviceStatus>? _statusSubscription;
 
@@ -1906,6 +2126,7 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
 
   String _friendlyExerciseState(String state) => switch (state) {
         'running' => 'Đang khởi động bài tập',
+        'stopping' => 'Đang đưa chân về vị trí ban đầu',
         'flexing' => 'Đang nâng/chuyển động lên',
         'extending' => 'Đang trở về tư thế ban đầu',
         'paused' => 'Đã tạm dừng',
@@ -1921,6 +2142,15 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
     final target = widget.planItem['target'] as Map? ?? const {};
     setState(() => _starting = true);
     try {
+      // Starting is an atomic user flow: always prepare this exact session
+      // first, wait for the Pi acknowledgement, then issue START.
+      await _ble.prepareExercise(
+        sessionId: '${widget.planItem['session_id'] ?? widget.planItem['id']}',
+        planItemId: '${widget.planItem['id']}',
+        exerciseCode: '${exercise['code']}',
+        sets: (target['sets'] as num?)?.toInt() ?? 1,
+        repetitions: (target['repetitions_per_set'] as num?)?.toInt() ?? 1,
+      );
       await _ble.startExercise(
         sessionId: '${widget.planItem['session_id'] ?? widget.planItem['id']}',
         planItemId: '${widget.planItem['id']}',
@@ -1931,9 +2161,9 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
       if (mounted) {
         setState(() => _deviceStatus = 'Đã bắt đầu bài tập');
       }
-    } catch (_) {
+    } catch (error) {
       if (mounted) {
-        setState(() => _deviceStatus = 'Không gửi được lệnh bắt đầu');
+        setState(() => _deviceStatus = 'Không bắt đầu được: $error');
       }
     } finally {
       if (mounted) setState(() => _starting = false);
@@ -1962,6 +2192,24 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
       }
     } finally {
       if (mounted) setState(() => _preparing = false);
+    }
+  }
+
+  Future<void> _stop() async {
+    final exercise = widget.planItem['exercise'] as Map;
+    setState(() => _stopping = true);
+    try {
+      await _ble.stopExercise(
+        sessionId: '${widget.planItem['session_id'] ?? widget.planItem['id']}',
+        exerciseCode: '${exercise['code']}',
+      );
+      if (mounted) {
+        setState(() => _deviceStatus = 'Đã đưa chân về vị trí ban đầu');
+      }
+    } catch (error) {
+      if (mounted) setState(() => _deviceStatus = 'Không dừng được: $error');
+    } finally {
+      if (mounted) setState(() => _stopping = false);
     }
   }
 
@@ -2046,6 +2294,16 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
                     child: CircularProgressIndicator(strokeWidth: 2))
                 : const Icon(Icons.play_arrow),
             label: const Text('Bắt đầu bài tập'),
+          ),
+          const SizedBox(height: 8),
+          OutlinedButton.icon(
+            onPressed: _stopping || !_ble.isConnected ? null : _stop,
+            icon: _stopping
+                ? const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.stop_circle_outlined),
+            label: const Text('Dừng và đưa chân về ban đầu'),
           ),
           const SizedBox(height: 8),
           Text('Trạng thái thiết bị: $_deviceStatus',
@@ -2508,12 +2766,13 @@ class _InfoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
+    return Material(
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outlineVariant),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
@@ -2763,12 +3022,13 @@ class _MenuTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
+    return Material(
+      color: colorScheme.surface,
+      shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outlineVariant),
+        side: BorderSide(color: colorScheme.outlineVariant),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 18, vertical: 12),

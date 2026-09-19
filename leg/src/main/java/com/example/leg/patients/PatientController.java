@@ -19,10 +19,13 @@ import org.springframework.web.bind.annotation.RestController;
 public class PatientController {
     private final AuthService authService;
     private final PatientDataService patientData;
+    private final com.example.leg.relationships.RelationshipService relationships;
 
-    public PatientController(AuthService authService, PatientDataService patientData) {
+    public PatientController(AuthService authService, PatientDataService patientData,
+            com.example.leg.relationships.RelationshipService relationships) {
         this.authService = authService;
         this.patientData = patientData;
+        this.relationships = relationships;
     }
 
     @GetMapping("/{patientId}/home")
@@ -31,11 +34,9 @@ public class PatientController {
         if (principal == null) {
             throw new ApiException(HttpStatus.UNAUTHORIZED, "auth.invalid_token", "Phiên đăng nhập không hợp lệ.");
         }
-        var me = authService.requireUser(principal.id());
-        if (!me.getId().equals(patientId)) {
-            throw new ApiException(HttpStatus.FORBIDDEN, "authorization.denied", "Bạn không có quyền xem hồ sơ này.");
-        }
-        return ApiResponse.of(patientData.home(me.getId(), me.getDisplayName(), me.getTimezone()));
+        relationships.requireCanView(principal, patientId);
+        var patient = authService.requireUser(patientId);
+        return ApiResponse.of(patientData.home(patient.getId(), patient.getDisplayName(), patient.getTimezone()));
     }
 
 }

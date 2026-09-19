@@ -10,6 +10,7 @@ abstract class AuthRepository {
     required String password,
     required String displayName,
     required bool acceptedTerms,
+    String role = 'patient',
   });
 
   Future<void> logout();

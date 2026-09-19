@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'dart:async';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
@@ -19,6 +20,10 @@ class FcmService {
 
   static String? _token;
   static String? get token => _token;
+  static final _tokenController = StreamController<String>.broadcast();
+  static Stream<String> get tokenStream => _tokenController.stream;
+  static final _messageController = StreamController<RemoteMessage>.broadcast();
+  static Stream<RemoteMessage> get messageStream => _messageController.stream;
 
   static Future<String?> initialize() async {
     try {
@@ -51,12 +56,14 @@ class FcmService {
 
     messaging.onTokenRefresh.listen((token) {
       _token = token;
+      _tokenController.add(token);
       if (kDebugMode) {
         debugPrint('FCM token refreshed: $token');
       }
     });
 
     FirebaseMessaging.onMessage.listen((message) {
+      _messageController.add(message);
       if (kDebugMode) {
         debugPrint('Foreground FCM: ${message.messageId}');
       }

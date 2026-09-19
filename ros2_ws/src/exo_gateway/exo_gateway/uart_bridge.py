@@ -17,7 +17,8 @@ import rclpy
 from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 
-from exo_interfaces.msg import DeviceCommand, DeviceState, ExerciseCommand, ExerciseStatus
+from exo_interfaces.msg import DeviceCommand, DeviceState, ExerciseCommand, ExerciseStatus, ImuSample
+from std_msgs.msg import String
 
 
 def crc16(data):
@@ -48,15 +49,26 @@ class UartBridge(Node):
     def __init__(self):
         super().__init__('uart_bridge')
         self.declare_parameter('device', '/dev/ttyUSB0')
-        self.declare_parameter('baudrate', 115200)
+        self.declare_parameter('baudrate', 921600)
         self.declare_parameter('reconnect_sec', 2.0)
         self._serial = None
         self._serial_lock = threading.Lock()
         self._stop = threading.Event()
-        self._state_pub = self.create_publisher(DeviceState, '/exo/state', 10)
+        # UART is only a telemetry source.  SafetyGateway is the single
+        # authoritative publisher of /exo/state; publishing there directly
+        # would make consumers receive alternating Pi/ESP32 snapshots.
+        self._state_pub = self.create_publisher(DeviceState, '/exo/state/raw', 10)
         self._exercise_status_pub = self.create_publisher(ExerciseStatus, '/exo/exercise/status', 10)
+        self._imu_pub = self.create_publisher(ImuSample, '/exo/imu', 100)
         self.create_subscription(DeviceCommand, '/exo/command/accepted', self._on_device_command, 10)
         self.create_subscription(ExerciseCommand, '/exo/exercise/accepted', self._on_exercise_command, 10)
+        self.create_subscription(String, '/exo/routine/accepted', self._on_routine_command, 10)
+        self._routine_stop = threading.Event()
+        self._routine_io_lock = threading.Lock()
+        self._status_condition = threading.Condition()
+        self._last_exercise_status = {}
+        self._routine_thread = None
+        self._active_routine_session = None
         self._reader = threading.Thread(target=self._read_loop, name='exo-uart-reader', daemon=True)
         self._reader.start()
 
@@ -99,6 +111,8 @@ class UartBridge(Node):
                    ExerciseCommand.ACTION_STOP: 'stop'}
         sides = {ExerciseCommand.SIDE_BOTH: 'both', ExerciseCommand.SIDE_LEFT: 'left',
                  ExerciseCommand.SIDE_RIGHT: 'right'}
+        if command.action == ExerciseCommand.ACTION_STOP:
+            self._routine_stop.set()
         self._send({
             'type': 'exercise_command', 'sequence': int(command.sequence),
             'session_id': command.session_id, 'plan_item_id': command.plan_item_id,
@@ -108,9 +122,126 @@ class UartBridge(Node):
             'assist_percent': float(command.assist_percent),
         })
 
+    def _on_routine_command(self, message):
+        try:
+            payload = json.loads(message.data)
+        except (TypeError, json.JSONDecodeError):
+            return
+        if payload.get('action', 'start') == 'stop':
+            self._routine_stop.set()
+            session_id = str(payload.get('session_id', ''))[:64]
+            with self._routine_io_lock:
+                self._send({'type': 'home_command', 'action': 'stop',
+                            'session_id': session_id})
+            return
+        if self._routine_thread is not None and self._routine_thread.is_alive():
+            self._publish_routine_status(
+                str(payload.get('session_id', ''))[:64], 'rejected',
+                'another routine is still active')
+            return
+        self._routine_stop = threading.Event()
+        self._active_routine_session = str(payload.get('session_id', ''))[:64]
+        self._routine_thread = threading.Thread(
+            target=self._run_routine, args=(payload, self._routine_stop),
+            name='exo-routine-runner', daemon=True)
+        self._routine_thread.start()
+
+    def _run_routine(self, payload, stop_event):
+        session_id = str(payload.get('session_id', ''))[:64]
+        self._publish_routine_status(session_id, 'preparing', 'Returning all cylinders to HOME')
+        if not self._routine_send(stop_event, {
+                'type': 'home_command', 'action': 'prepare',
+                'session_id': session_id}):
+            return
+        if not self._wait_for_status(session_id, {'home_ready'}, 10.0, stop_event):
+            if not stop_event.is_set():
+                self._publish_routine_status(session_id, 'rejected', 'ESP32 HOME acknowledgement timeout')
+            return
+        self._publish_routine_status(session_id, 'running')
+        repetitions = int(payload.get('repetitions', 1))
+        completed = 0
+        for _ in range(repetitions):
+            for step in payload.get('steps', []):
+                for _ in range(int(step.get('repeat_count', 1))):
+                    if stop_event.is_set():
+                        return
+                    if not self._routine_send(stop_event, {
+                            'type': 'motor_command', 'session_id': session_id,
+                            'motor': step['motor'], 'direction': step['direction'],
+                            'duration_ms': int(step['duration_ms'])}):
+                        return
+                    self._publish_routine_status(
+                        session_id,
+                        'flexing' if step['direction'] == 'OUT' else 'extending')
+                    if stop_event.wait(int(step.get('duration_ms', 0)) / 1000.0):
+                        return
+                    if not self._routine_send(stop_event, {
+                            'type': 'motor_command', 'session_id': session_id,
+                            'motor': step['motor'], 'direction': 'STOP',
+                            'duration_ms': 0}):
+                        return
+                    if stop_event.wait(int(step.get('rest_after_ms', 0)) / 1000.0):
+                        return
+            completed += 1
+            self._publish_routine_status(
+                session_id, 'running', completed_repetitions=completed,
+                target_repetitions=repetitions)
+        if not self._routine_send(stop_event, {
+                'type': 'home_command', 'action': 'complete',
+                'session_id': session_id}):
+            return
+        if not self._wait_for_status(session_id, {'completed'}, 10.0, stop_event):
+            if not stop_event.is_set():
+                self._publish_routine_status(session_id, 'rejected', 'ESP32 final HOME acknowledgement timeout')
+
+    def _routine_send(self, stop_event, payload):
+        with self._routine_io_lock:
+            if stop_event.is_set():
+                return False
+            self._send(payload)
+            return True
+
+    def _wait_for_status(self, session_id, states, timeout, stop_event):
+        deadline = time.monotonic() + timeout
+        with self._status_condition:
+            while not stop_event.is_set():
+                state = self._last_exercise_status.get(session_id)
+                if state in states:
+                    return True
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    return False
+                self._status_condition.wait(min(remaining, 0.2))
+        return False
+
+    def _publish_routine_status(self, session_id, state, reason='',
+                                completed_repetitions=0, target_repetitions=0):
+        status = ExerciseStatus()
+        status.session_id = session_id
+        status.exercise_code = 'custom_routine'
+        status.state = state
+        status.reason = reason
+        status.completed_repetitions = completed_repetitions
+        status.target_repetitions = target_repetitions
+        status.target_sets = 1
+        self._exercise_status_pub.publish(status)
+
     def _handle_rx(self, payload):
         kind = payload.get('type')
-        if kind == 'device_status':
+        if kind == 'imu_sample':
+            sample = ImuSample()
+            sample.header.stamp = self.get_clock().now().to_msg()
+            sample.sequence = int(payload.get('seq', 0))
+            sample.sensor_time_ms = int(payload.get('t_ms', 0))
+            sample.channel = int(payload.get('channel', 4))
+            sample.ax = float(payload.get('ax', 0.0))
+            sample.ay = float(payload.get('ay', 0.0))
+            sample.az = float(payload.get('az', 0.0))
+            sample.gx = float(payload.get('gx', 0.0))
+            sample.gy = float(payload.get('gy', 0.0))
+            sample.gz = float(payload.get('gz', 0.0))
+            self._imu_pub.publish(sample)
+        elif kind == 'device_status':
             state = DeviceState()
             state.state = {
                 'disarmed': DeviceState.STATE_DISARMED,
@@ -140,7 +271,18 @@ class UartBridge(Node):
             status.repetition_duration_ms = int(payload.get('repetition_duration_ms', 0))
             status.total_repetitions = int(payload.get('total_repetitions', 0))
             status.target_total_repetitions = int(payload.get('target_total_repetitions', 0))
+            with self._status_condition:
+                self._last_exercise_status[status.session_id] = status.state
+                self._status_condition.notify_all()
             self._exercise_status_pub.publish(status)
+            if (status.session_id == self._active_routine_session):
+                if status.state in ('rejected', 'not_ready'):
+                    self._routine_stop.set()
+                    with self._routine_io_lock:
+                        self._send({'type': 'home_command', 'action': 'stop',
+                                    'session_id': status.session_id})
+                elif status.state in ('completed', 'stopped'):
+                    self._active_routine_session = None
         elif kind == 'exercise_selected':
             exercise_code = str(payload.get('exercise_code', ''))[:64]
             self.get_logger().info(f'ESP32 selected exercise {exercise_code}')

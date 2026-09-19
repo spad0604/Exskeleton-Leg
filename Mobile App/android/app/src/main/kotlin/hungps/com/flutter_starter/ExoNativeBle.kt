@@ -43,6 +43,8 @@ class ExoNativeBle(
         private const val STATUS = "6e400103-b5a3-f393-e0a9-e50e24dcca9e"
         private const val CCCD = "00002902-0000-1000-8000-00805f9b34fb"
         private const val TIMEOUT_MS = 20_000L
+        private const val OPERATION_TIMEOUT_MS = 8_000L
+        private const val REQUESTED_MTU = 512
 
         private val serviceUuid = UUID.fromString(SERVICE)
         private val controlUuid = UUID.fromString(CONTROL)
@@ -62,6 +64,8 @@ class ExoNativeBle(
     private var pendingSubscribe: MethodChannel.Result? = null
     private var bondReceiver: BroadcastReceiver? = null
     private var timeout: Runnable? = null
+    private var operationTimeout: Runnable? = null
+    private var discoveryStarted = false
 
     init {
         channel.setMethodCallHandler(this)
@@ -103,6 +107,7 @@ class ExoNativeBle(
     }
 
     private fun openGatt(device: BluetoothDevice) {
+        discoveryStarted = false
         gatt = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
             device.connectGatt(activity, false, callback, BluetoothDevice.TRANSPORT_LE)
         } else {
@@ -126,6 +131,12 @@ class ExoNativeBle(
             return
         }
         pendingWrite = result
+        armOperationTimeout("write") {
+            val pending = pendingWrite ?: return@armOperationTimeout
+            pendingWrite = null
+            pending.error("write_timeout", "BLE write timed out", null)
+            failConnection("BLE write timed out")
+        }
         characteristic.writeType = BluetoothGattCharacteristic.WRITE_TYPE_DEFAULT
         characteristic.value = bytes
         if (!gatt!!.writeCharacteristic(characteristic)) {
@@ -140,6 +151,10 @@ class ExoNativeBle(
             result.error("not_connected", "Status characteristic is not ready", null)
             return
         }
+        if (pendingSubscribe != null || pendingWrite != null) {
+            result.error("busy", "A BLE GATT operation is already in progress", null)
+            return
+        }
         if (!currentGatt.setCharacteristicNotification(characteristic, true)) {
             result.error("notify", "Could not enable local notifications", null)
             return
@@ -149,13 +164,16 @@ class ExoNativeBle(
             result.success(null)
             return
         }
-        if (pendingSubscribe != null || pendingWrite != null) {
-            result.error("busy", "A BLE GATT operation is already in progress", null)
-            return
-        }
         pendingSubscribe = result
+        armOperationTimeout("subscribe") {
+            val pending = pendingSubscribe ?: return@armOperationTimeout
+            pendingSubscribe = null
+            pending.error("notify_timeout", "BLE notification setup timed out", null)
+            failConnection("BLE notification setup timed out")
+        }
         descriptor.value = BluetoothGattDescriptor.ENABLE_NOTIFICATION_VALUE
         if (!currentGatt.writeDescriptor(descriptor)) {
+            cancelOperationTimeout()
             pendingSubscribe = null
             result.error("notify", "Could not write notification descriptor", null)
         }
@@ -163,18 +181,31 @@ class ExoNativeBle(
 
     private val callback = object : BluetoothGattCallback() {
         override fun onConnectionStateChange(gatt: BluetoothGatt, statusCode: Int, newState: Int) {
+            if (gatt !== this@ExoNativeBle.gatt) {
+                gatt.close()
+                return
+            }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
+                // Keep the supervision link active while the Pi sends status
+                // notifications and the phone changes Flutter routes.
+                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 if (gatt.device.bondState == BluetoothDevice.BOND_BONDING) {
                     waitForBondThenDiscover(gatt)
                 } else {
-                    discover(gatt)
+                    negotiateMtuThenDiscover(gatt)
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
-                failConnect("GATT disconnected (status=$statusCode)")
+                failConnection("GATT disconnected (status=$statusCode)")
             }
         }
 
+        override fun onMtuChanged(gatt: BluetoothGatt, mtu: Int, statusCode: Int) {
+            if (gatt !== this@ExoNativeBle.gatt) return
+            discover(gatt)
+        }
+
         override fun onServicesDiscovered(gatt: BluetoothGatt, statusCode: Int) {
+            if (gatt !== this@ExoNativeBle.gatt) return
             if (statusCode != BluetoothGatt.GATT_SUCCESS) {
                 failConnect("Service discovery failed (status=$statusCode)")
                 return
@@ -188,6 +219,7 @@ class ExoNativeBle(
             cancelTimeout()
             pendingConnect?.success(null)
             pendingConnect = null
+            emitTransportStatus("services_ready", "")
         }
 
         override fun onCharacteristicWrite(
@@ -195,6 +227,7 @@ class ExoNativeBle(
             characteristic: BluetoothGattCharacteristic,
             statusCode: Int,
         ) {
+            if (gatt !== this@ExoNativeBle.gatt) return
             if (characteristic.uuid == controlUuid) {
                 finishWrite(statusCode == BluetoothGatt.GATT_SUCCESS, "GATT status=$statusCode")
             }
@@ -205,7 +238,9 @@ class ExoNativeBle(
             descriptor: BluetoothGattDescriptor,
             statusCode: Int,
         ) {
+            if (gatt !== this@ExoNativeBle.gatt) return
             if (descriptor.uuid == cccdUuid) {
+                cancelOperationTimeout()
                 val result = pendingSubscribe ?: return
                 pendingSubscribe = null
                 if (statusCode == BluetoothGatt.GATT_SUCCESS) {
@@ -221,7 +256,7 @@ class ExoNativeBle(
             gatt: BluetoothGatt,
             characteristic: BluetoothGattCharacteristic,
         ) {
-            if (characteristic.uuid == statusUuid) emitStatus(characteristic.value)
+            if (gatt === this@ExoNativeBle.gatt && characteristic.uuid == statusUuid) emitStatus(characteristic.value)
         }
 
         override fun onCharacteristicChanged(
@@ -229,12 +264,24 @@ class ExoNativeBle(
             characteristic: BluetoothGattCharacteristic,
             value: ByteArray,
         ) {
-            if (characteristic.uuid == statusUuid) emitStatus(value)
+            if (gatt === this@ExoNativeBle.gatt && characteristic.uuid == statusUuid) emitStatus(value)
         }
     }
 
     private fun discover(currentGatt: BluetoothGatt) {
+        if (currentGatt !== gatt || discoveryStarted) return
+        discoveryStarted = true
         if (!currentGatt.discoverServices()) failConnect("BluetoothGatt.discoverServices returned false")
+    }
+
+    private fun negotiateMtuThenDiscover(currentGatt: BluetoothGatt) {
+        if (currentGatt !== gatt) return
+        val requested = currentGatt.requestMtu(REQUESTED_MTU)
+        if (!requested) {
+            discover(currentGatt)
+            return
+        }
+        main.postDelayed({ discover(currentGatt) }, 1_200L)
     }
 
     private fun waitForBondThenDiscover(currentGatt: BluetoothGatt) {
@@ -247,7 +294,7 @@ class ExoNativeBle(
                 if (state == BluetoothDevice.BOND_NONE || state == BluetoothDevice.BOND_BONDED) {
                     activity.unregisterReceiver(this)
                     bondReceiver = null
-                    discover(currentGatt)
+                    negotiateMtuThenDiscover(currentGatt)
                 }
             }
         }
@@ -281,6 +328,7 @@ class ExoNativeBle(
 
     private fun finishWrite(ok: Boolean, message: String) {
         val result = pendingWrite ?: return
+        cancelOperationTimeout()
         pendingWrite = null
         if (ok) result.success(null) else result.error("write", message, null)
     }
@@ -289,6 +337,25 @@ class ExoNativeBle(
         cancelTimeout()
         pendingConnect?.error("connect", message, null)
         pendingConnect = null
+        failConnection(message)
+    }
+
+    private fun failConnection(message: String) {
+        cancelTimeout()
+        cancelOperationTimeout()
+        pendingConnect?.error("connect", message, null)
+        pendingConnect = null
+        pendingWrite?.error("write", message, null)
+        pendingWrite = null
+        pendingSubscribe?.error("notify", message, null)
+        pendingSubscribe = null
+        val current = gatt
+        gatt = null
+        control = null
+        status = null
+        discoveryStarted = false
+        current?.close()
+        emitTransportStatus("disconnected", message)
     }
 
     private fun armTimeout(operation: String) {
@@ -305,8 +372,26 @@ class ExoNativeBle(
         timeout = null
     }
 
+    private fun armOperationTimeout(operation: String, action: () -> Unit) {
+        cancelOperationTimeout()
+        val task = Runnable(action)
+        operationTimeout = task
+        main.postDelayed(task, OPERATION_TIMEOUT_MS)
+    }
+
+    private fun cancelOperationTimeout() {
+        operationTimeout?.let(main::removeCallbacks)
+        operationTimeout = null
+    }
+
+    private fun emitTransportStatus(state: String, reason: String) {
+        val safeReason = reason.replace("\\", "\\\\").replace("\"", "\\\"")
+        emitStatus("{\"v\":1,\"type\":\"transport_status\",\"state\":\"$state\",\"reason\":\"$safeReason\"}".toByteArray())
+    }
+
     private fun closeGatt() {
         cancelTimeout()
+        cancelOperationTimeout()
         pendingConnect?.error("cancelled", "Previous BLE connection was cancelled", null)
         pendingConnect = null
         pendingWrite?.error("cancelled", "BLE connection was closed", null)
@@ -317,11 +402,13 @@ class ExoNativeBle(
             runCatching { activity.unregisterReceiver(it) }
             bondReceiver = null
         }
-        gatt?.disconnect()
-        gatt?.close()
+        val current = gatt
         gatt = null
         control = null
         status = null
+        discoveryStarted = false
+        current?.disconnect()
+        current?.close()
     }
 
     private fun hasConnectPermission(): Boolean =

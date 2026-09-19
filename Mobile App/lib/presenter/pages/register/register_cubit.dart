@@ -27,6 +27,7 @@ class RegisterCubit extends Cubit<RegisterState> {
     required String email,
     required String password,
     required bool acceptedTerms,
+    String role = 'patient',
   }) async {
     if (state.status == RegisterStatus.submitting) return;
     emit(const RegisterState(status: RegisterStatus.submitting));
@@ -36,6 +37,7 @@ class RegisterCubit extends Cubit<RegisterState> {
         password: password,
         displayName: displayName,
         acceptedTerms: acceptedTerms,
+        role: role,
       );
       emit(RegisterState(status: RegisterStatus.success, account: account));
     } catch (error) {

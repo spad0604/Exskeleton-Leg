@@ -13,6 +13,7 @@ setup(
         ('share/' + package_name + '/config', ['config/safety.yaml']),
     ],
     install_requires=['setuptools'],
+    test_suite='test',
     zip_safe=True,
     maintainer='Exoskeleton team',
     maintainer_email='maintainers@example.com',
@@ -22,5 +23,6 @@ setup(
         'safety_gateway = exo_gateway.safety_gateway:main',
         'ble_bridge = exo_gateway.ble_bridge:main',
         'uart_bridge = exo_gateway.uart_bridge:main',
+        'fall_detector = exo_gateway.fall_detector:main',
     ]},
 )

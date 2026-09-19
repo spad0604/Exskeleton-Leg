@@ -1,4 +1,5 @@
 import 'package:injectable/injectable.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_starter/data/entities/auth_session.dart';
 import 'package:flutter_starter/data/entities/request/login_params.dart';
 import 'package:flutter_starter/data/entities/request/register_params.dart';
@@ -112,6 +113,51 @@ class NetworkDataSource {
     return _dataList(response.data);
   }
 
+  Future<List<Map<String, dynamic>>> getMotionLibrary() async {
+    final response = await _dio.get<Map<String, dynamic>>('motion-library');
+    return _dataList(response.data);
+  }
+
+  Future<List<Map<String, dynamic>>> getMotionRoutines(String patientId) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/motion-routines',
+    );
+    return _dataList(response.data);
+  }
+
+  Future<Map<String, dynamic>> createMotionRoutine({
+    required String patientId,
+    required String name,
+    String description = '',
+    required int repetitions,
+    String executionMode = 'ONE_LEG',
+    String startingSide = 'RIGHT',
+    required List<Map<String, dynamic>> steps,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'patients/$patientId/motion-routines',
+      data: {
+        'name': name,
+        'description': description,
+        'repetitions': repetitions,
+        'execution_mode': executionMode,
+        'starting_side': startingSide,
+        'steps': steps,
+      },
+    );
+    return _data(response.data);
+  }
+
+  Future<Map<String, dynamic>> dispatchMotionRoutine({
+    required String patientId,
+    required String routineId,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'patients/$patientId/motion-routines/$routineId/dispatch',
+    );
+    return _data(response.data);
+  }
+
   Future<Map<String, dynamic>> getPatient(String patientId) async {
     final response =
         await _dio.get<Map<String, dynamic>>('patients/$patientId');
@@ -122,14 +168,59 @@ class NetworkDataSource {
     final refreshToken = await _dio.getRefreshToken();
     try {
       if (refreshToken != null) {
-        await _dio.post<Map<String, dynamic>>(
+        await _dio.post<dynamic>(
           'auth/logout',
           data: {'refresh_token': refreshToken},
+          options: Options(
+            responseType: ResponseType.bytes,
+            // Logout is best-effort; always clear the local session below.
+            validateStatus: (status) => status == null || status < 500,
+          ),
         );
       }
     } finally {
       await _dio.clearSession();
     }
+  }
+
+  Future<List<Map<String, dynamic>>> getRelationships() async {
+    final response = await _dio.get<Map<String, dynamic>>('me/relationships');
+    return _dataList(response.data);
+  }
+
+  Future<Map<String, dynamic>> inviteRelationship(String email) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'me/relationships/invite',
+      data: {'email': email.trim().toLowerCase()},
+    );
+    return _data(response.data);
+  }
+
+  Future<Map<String, dynamic>> updateRelationship(
+      String id, String action) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'me/relationships/$id/$action',
+    );
+    return _data(response.data);
+  }
+
+  Future<Map<String, dynamic>> reportFall({
+    required String patientId,
+    String message = '',
+    String? alertId,
+    String? deviceId,
+    double? probability,
+  }) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'patients/$patientId/alerts/fall',
+      data: {
+        'message': message,
+        if (alertId != null && alertId.isNotEmpty) 'alert_id': alertId,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (probability != null) 'fall_probability': probability,
+      },
+    );
+    return _data(response.data);
   }
 
   Map<String, dynamic> _data(Map<String, dynamic>? envelope) {

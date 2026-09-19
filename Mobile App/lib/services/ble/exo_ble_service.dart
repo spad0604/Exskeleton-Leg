@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
@@ -18,15 +19,20 @@ class ExoBleService {
   static const _nativeStatus = EventChannel('exo_leg/native_ble_status');
   StreamSubscription<ConnectionStateUpdate>? _connection;
   StreamSubscription<dynamic>? _statusSubscription;
-  bool _statusRetryScheduled = false;
   Future<void> _writeQueue = Future<void>.value();
   Future<void>? _connecting;
+  Timer? _reconnectTimer;
+  var _reconnectAttempt = 0;
+  bool _disposed = false;
   QualifiedCharacteristic? _control;
+  String? _lastDeviceId;
   final _status = StreamController<ExerciseDeviceStatus>.broadcast();
   final _deviceStatus = StreamController<LiveDeviceStatus>.broadcast();
+  final _fallAlerts = StreamController<FallAlert>.broadcast();
 
   Stream<ExerciseDeviceStatus> get status => _status.stream;
   Stream<LiveDeviceStatus> get deviceStatus => _deviceStatus.stream;
+  Stream<FallAlert> get fallAlerts => _fallAlerts.stream;
   bool get isConnected => _control != null;
 
   Future<List<ExoBleDevice>> discoverExoskeletons() async {
@@ -66,7 +72,9 @@ class ExoBleService {
   }
 
   Future<void> connect({String? deviceId}) {
-    if (isConnected) return Future<void>.value();
+    if (isConnected && (deviceId == null || deviceId == _lastDeviceId)) {
+      return Future<void>.value();
+    }
 
     // Device selection and exercise preparation can arrive almost together.
     // FlutterReactiveBle closes the first Android GATT client if a second
@@ -85,6 +93,7 @@ class ExoBleService {
   }
 
   Future<void> _connectOnce(String? deviceId) async {
+    _reconnectTimer?.cancel();
     await _resetConnection();
     final id = deviceId ?? (await _firstDiscoveredDeviceId());
     for (var attempt = 1; attempt <= 3; attempt++) {
@@ -105,9 +114,15 @@ class ExoBleService {
   bool _isTransientConnectionError(Object error) {
     final message = error.toString().toLowerCase();
     return message.contains('timed out') ||
+        message.contains('timeout') ||
         message.contains('status=257') ||
+        message.contains('status=22') ||
+        message.contains('status=133') ||
+        message.contains('not_connected') ||
+        message.contains('cancelled') ||
+        message.contains('notify') ||
         message.contains('disconnected') ||
-        message.contains('status=133');
+        message.contains('gatt');
   }
 
   Future<void> _resetConnection() async {
@@ -155,54 +170,66 @@ class ExoBleService {
       rethrow;
     }
 
-    _control = QualifiedCharacteristic(
+    final control = QualifiedCharacteristic(
       serviceId: serviceId,
       characteristicId: Uuid.parse(ExoBleProtocol.controlUuid),
       deviceId: deviceId,
     );
-    await _startStatusSubscription(deviceId);
-    // Status subscription is best-effort and retried because Android may still
-    // be finishing bonding/service discovery. It must not make transport
-    // connection fail; control writes remain explicitly user-triggered.
+    try {
+      await _startStatusSubscription(deviceId);
+    } catch (_) {
+      await _resetConnection();
+      rethrow;
+    }
+    _control = control;
+    _lastDeviceId = deviceId;
+    _reconnectAttempt = 0;
     developer.log('GATT transport connected; awaiting user command',
         name: 'ExoBle');
   }
 
   Future<void> _startStatusSubscription(String deviceId) async {
     await _statusSubscription?.cancel();
+    Object? lastError;
+    _statusSubscription = _nativeStatus.receiveBroadcastStream().listen(
+      (event) {
+        try {
+          final bytes = List<int>.from(event as List<dynamic>);
+          final payload = decodeBleStatus(bytes);
+          final type = payload['type'];
+          if (type == 'exercise_status') {
+            _status.add(ExerciseDeviceStatus.fromJson(payload));
+          } else if (type == 'device_status') {
+            _deviceStatus.add(LiveDeviceStatus.fromJson(payload));
+          } else if (type == 'fall_alert') {
+            _fallAlerts.add(FallAlert.fromJson(payload));
+          } else if (type == 'transport_status' &&
+              payload['state'] == 'disconnected') {
+            _control = null;
+            developer.log(
+              'Native GATT disconnected: ${payload['reason']}',
+              name: 'ExoBle',
+            );
+            _scheduleReconnect();
+          }
+        } catch (error, stackTrace) {
+          developer.log('BLE status decode failed: $error',
+              name: 'ExoBle', error: error, stackTrace: stackTrace);
+        }
+      },
+      onError: (Object error, StackTrace stackTrace) {
+        _control = null;
+        developer.log('BLE status channel closed: $error',
+            name: 'ExoBle', error: error, stackTrace: stackTrace);
+      },
+    );
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
-        _statusSubscription = _nativeStatus.receiveBroadcastStream().listen(
-          (event) {
-            try {
-              final bytes = List<int>.from(event as List<dynamic>);
-              final payload = decodeBleStatus(bytes);
-              final type = payload['type'];
-              if (type == 'exercise_status') {
-                _status.add(ExerciseDeviceStatus.fromJson(payload));
-              } else if (type == 'device_status') {
-                _deviceStatus.add(LiveDeviceStatus.fromJson(payload));
-              }
-            } catch (error, stackTrace) {
-              developer.log('BLE status decode failed: $error',
-                  name: 'ExoBle', error: error, stackTrace: stackTrace);
-            }
-          },
-          onError: (Object error, StackTrace stackTrace) {
-            developer.log('BLE status subscription unavailable: $error',
-                name: 'ExoBle', error: error, stackTrace: stackTrace);
-            if (!_statusRetryScheduled) {
-              _statusRetryScheduled = true;
-              unawaited(Future<void>.delayed(const Duration(seconds: 3), () {
-                _statusRetryScheduled = false;
-                return _startStatusSubscription(deviceId);
-              }));
-            }
-          },
-        );
         await _native.invokeMethod<void>('subscribe');
+        await Future<void>.delayed(const Duration(milliseconds: 150));
         return;
       } catch (error, stackTrace) {
+        lastError = error;
         developer.log('BLE status subscription retry $attempt failed: $error',
             name: 'ExoBle', error: error, stackTrace: stackTrace);
         if (attempt < 3) {
@@ -210,7 +237,41 @@ class ExoBleService {
         }
       }
     }
+    await _statusSubscription?.cancel();
+    _statusSubscription = null;
+    throw StateError('Không đăng ký được trạng thái BLE: $lastError');
   }
+
+  void _scheduleReconnect() {
+    if (_disposed ||
+        _lastDeviceId == null ||
+        _reconnectTimer?.isActive == true) {
+      return;
+    }
+    final delaySeconds = 1 << _reconnectAttempt.clamp(0, 3);
+    _reconnectAttempt++;
+    _reconnectTimer = Timer(Duration(seconds: delaySeconds), () async {
+      if (_disposed || isConnected) return;
+      try {
+        await connect(deviceId: _lastDeviceId);
+        developer.log('BLE automatically reconnected', name: 'ExoBle');
+      } catch (error) {
+        developer.log('BLE automatic reconnect failed: $error', name: 'ExoBle');
+        _scheduleReconnect();
+      }
+    });
+  }
+
+  Future<ExerciseDeviceStatus> _waitForExerciseStatus({
+    required String sessionId,
+    required Set<String> terminalStates,
+    Duration timeout = const Duration(seconds: 8),
+  }) =>
+      status
+          .firstWhere((event) =>
+              event.sessionId == sessionId &&
+              terminalStates.contains(event.state))
+          .timeout(timeout);
 
   Future<void> prepareExercise({
     required String sessionId,
@@ -220,6 +281,10 @@ class ExoBleService {
     required int repetitions,
   }) async {
     await connect();
+    final acknowledgement = _waitForExerciseStatus(
+      sessionId: sessionId,
+      terminalStates: const {'prepared', 'not_ready', 'rejected'},
+    );
     await _write({
       'type': 'prepare_exercise',
       'session_id': sessionId,
@@ -228,6 +293,10 @@ class ExoBleService {
       'sets': sets,
       'repetitions': repetitions,
     });
+    final response = await acknowledgement;
+    if (response.state != 'prepared') {
+      throw StateError(response.reason ?? 'Thiết bị chưa sẵn sàng');
+    }
   }
 
   Future<void> startExercise({
@@ -238,13 +307,17 @@ class ExoBleService {
     int sets = 1,
     int repetitions = 1,
     double assistPercent = 0,
-  }) {
+  }) async {
     final resolvedSide = side != 'both'
         ? side
         : (exerciseCode.contains('left')
             ? 'left'
             : (exerciseCode.contains('right') ? 'right' : 'both'));
-    return _sendExerciseCommand(
+    final acknowledgement = _waitForExerciseStatus(
+      sessionId: sessionId,
+      terminalStates: const {'running', 'flexing', 'not_ready', 'rejected'},
+    );
+    await _sendExerciseCommand(
       sessionId: sessionId,
       exerciseCode: exerciseCode,
       planItemId: planItemId,
@@ -254,6 +327,10 @@ class ExoBleService {
       repetitions: repetitions,
       assistPercent: assistPercent,
     );
+    final response = await acknowledgement;
+    if (response.state == 'not_ready' || response.state == 'rejected') {
+      throw StateError(response.reason ?? 'Thiết bị từ chối bắt đầu bài tập');
+    }
   }
 
   Future<void> pauseExercise({
@@ -272,13 +349,85 @@ class ExoBleService {
     required String sessionId,
     String exerciseCode = 'walk',
     int sets = 1,
-  }) =>
-      _sendExerciseCommand(
-        sessionId: sessionId,
-        exerciseCode: exerciseCode,
-        action: 'stop',
-        sets: sets,
-      );
+  }) async {
+    final acknowledgement = _waitForExerciseStatus(
+      sessionId: sessionId,
+      terminalStates: const {'stopped'},
+      timeout: const Duration(seconds: 15),
+    );
+    await _sendExerciseCommand(
+      sessionId: sessionId,
+      exerciseCode: exerciseCode,
+      action: 'stop',
+      sets: sets,
+    );
+    await acknowledgement;
+  }
+
+  /// Sends a server-compiled routine in acknowledged chunks. A normal routine
+  /// is larger than one BLE ATT write, even with a negotiated 512-byte MTU.
+  Future<void> sendRoutine(
+    Map<String, Object?> routine, {
+    required String sessionId,
+  }) async {
+    await connect();
+    final payload = <String, Object?>{
+      ...routine,
+      'v': ExoBleProtocol.protocolVersion,
+      'type': 'routine_command',
+      'action': 'start',
+      'session_id': sessionId,
+    };
+    final raw = utf8.encode(jsonEncode(payload));
+    const rawChunkSize = 180;
+    final chunkCount = (raw.length / rawChunkSize).ceil();
+    final transferId = '${DateTime.now().microsecondsSinceEpoch}';
+    final acknowledgement = _waitForExerciseStatus(
+      sessionId: sessionId,
+      terminalStates: const {'running', 'not_ready', 'rejected'},
+      timeout: const Duration(seconds: 20),
+    );
+    await _write({
+      'type': 'routine_begin',
+      'transfer_id': transferId,
+      'session_id': sessionId,
+      'total_bytes': raw.length,
+      'total_chunks': chunkCount,
+    });
+    for (var index = 0; index < chunkCount; index++) {
+      final start = index * rawChunkSize;
+      final candidateEnd = start + rawChunkSize;
+      final end = candidateEnd < raw.length ? candidateEnd : raw.length;
+      await _write({
+        'type': 'routine_chunk',
+        'transfer_id': transferId,
+        'index': index,
+        'data': base64Encode(raw.sublist(start, end)),
+      });
+    }
+    await _write({
+      'type': 'routine_commit',
+      'transfer_id': transferId,
+    });
+    final response = await acknowledgement;
+    if (response.state != 'running') {
+      throw StateError(response.reason ?? 'Pi từ chối quy trình');
+    }
+  }
+
+  Future<void> stopRoutine({required String sessionId}) async {
+    final acknowledgement = _waitForExerciseStatus(
+      sessionId: sessionId,
+      terminalStates: const {'stopped'},
+      timeout: const Duration(seconds: 15),
+    );
+    await _write({
+      'type': 'routine_control',
+      'action': 'stop',
+      'session_id': sessionId,
+    });
+    await acknowledgement;
+  }
 
   Future<void> _sendExerciseCommand({
     required String sessionId,
@@ -311,43 +460,49 @@ class ExoBleService {
   }
 
   Future<void> _writeUnlocked(Map<String, Object?> payload) async {
-    final characteristic = _control;
-    if (characteristic == null) {
-      throw StateError('Chưa kết nối ExoLeg-1 qua Bluetooth');
+    final bytes = ExoBleProtocol.encode(payload);
+    if (bytes.length > 384) {
+      throw StateError('Lệnh Bluetooth vượt quá giới hạn 384 byte.');
     }
+    Object? lastError;
     for (var attempt = 1; attempt <= 3; attempt++) {
       try {
+        if (_control == null) {
+          await connect(deviceId: _lastDeviceId);
+        }
         // The protocol defines the control point as write-with-response. This
         // also gives Android a definitive ATT completion before a subsequent
         // command or status subscription starts.
         await _native.invokeMethod<void>('write', {
-          'value': Uint8List.fromList(ExoBleProtocol.encode(payload)),
+          'value': Uint8List.fromList(bytes),
         });
         developer.log('BLE control write succeeded (attempt $attempt)',
             name: 'ExoBle');
         return;
       } catch (error) {
-        final message = error.toString().toLowerCase();
-        final transient = message.contains('bonding') ||
-            message.contains('service_discovery') ||
-            message.contains('gatt');
+        lastError = error;
+        final transient = _isTransientConnectionError(error);
         if (!transient || attempt == 3) break;
         developer.log(
             'BLE control write waiting for Android GATT (attempt $attempt): $error',
             name: 'ExoBle',
             error: error);
-        await Future<void>.delayed(Duration(seconds: attempt * 2));
+        _control = null;
+        await _resetConnection();
+        await Future<void>.delayed(Duration(milliseconds: 500 * attempt));
       }
     }
-    throw StateError(
-        'Bluetooth chưa sẵn sàng để gửi lệnh. Hãy giữ kết nối và thử lại.');
+    throw StateError('Bluetooth chưa sẵn sàng để gửi lệnh: $lastError');
   }
 
   Future<void> dispose() async {
+    _disposed = true;
+    _reconnectTimer?.cancel();
     await _statusSubscription?.cancel();
     await _connection?.cancel();
     await _status.close();
     await _deviceStatus.close();
+    await _fallAlerts.close();
   }
 }
 

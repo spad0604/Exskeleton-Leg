@@ -1,0 +1,3 @@
+# Install on the Raspberry Pi. Use the wheel matching the Pi's Python version.
+tflite-runtime
+numpy
