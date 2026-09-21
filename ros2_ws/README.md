@@ -119,6 +119,37 @@ lệnh start xuống ESP32 và Mobile sẽ nhận not_ready/rejected. Đây là 
 
 ### Đọc log ROS và Bluetooth
 
+### Tự khởi động gateway khi Pi bật
+
+Pi này chạy ROS2 trong Docker. Sau khi build workspace và đặt model tại
+`/home/robot/exo_fall_detector_v4.tflite`, cài service:
+
+```bash
+sudo install -d /etc/systemd/system/bluetooth.service.d
+sudo install -m 0644 /home/robot/ros2_ws/bluetooth-exo.conf \
+  /etc/systemd/system/bluetooth.service.d/zz-exo.conf
+sudo cp /home/robot/ros2_ws/exo-gateway.service /etc/systemd/system/exo-gateway.service
+sudo systemctl daemon-reload
+sudo systemctl restart bluetooth.service
+sudo systemctl enable --now exo-gateway.service
+sudo systemctl status exo-gateway.service
+```
+
+`zz-exo.conf` tắt các profile audio/SAP không dùng trên Pi. Nếu bật các profile
+LE Audio thử nghiệm, Android phải duyệt rất nhiều GATT characteristic và có thể
+timeout hoặc rớt kết nối sau khoảng 30 giây. Tên `zz-` giúp cấu hình này được
+áp dụng sau các override cũ có thể bật `bluetoothd --experimental`.
+
+Xem log realtime:
+
+```bash
+sudo journalctl -u exo-gateway.service -f
+```
+
+Service tự khởi động container ROS2, mount BLE/UART/workspace/model và tự khởi
+động lại nếu ROS2, BLE hoặc UART bị lỗi. Script trong container dùng workspace
+`/root/ros2_ws`.
+
 Mở terminal SSH thứ hai. Trên host Pi, log BLE của BlueZ:
 
 ```bash

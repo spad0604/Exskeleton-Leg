@@ -185,6 +185,10 @@ public class PatientDataService {
     public List<Map<String, Object>> exercises() { return jdbc.queryForList("select * from exercises where active=true order by category, code").stream().map(this::exerciseOutput).toList(); }
     public Map<String, Object> exercise(UUID exerciseId) { return exerciseOutput(jdbc.queryForMap("select * from exercises where id=? and active=true", exerciseId)); }
     public List<Map<String, Object>> notifications(UUID patientId) { return jdbc.queryForList("select id, severity, title, occurred_at, resolved_at from patient_alerts where patient_id=? order by occurred_at desc", patientId).stream().map(this::alertOutput).toList(); }
+    public List<Map<String, Object>> alerts(UUID patientId, int limit) {
+        return jdbc.queryForList("select id, severity, title, message, type, occurred_at, resolved_at from patient_alerts where patient_id=? order by occurred_at desc limit ?", patientId, limit)
+                .stream().map(this::alertOutput).toList();
+    }
     public void registerToken(UUID userId, String token, String platform) {
         var updated = jdbc.update("update fcm_tokens set platform=?, last_seen_at=? where user_id=? and token=?", platform, Timestamp.from(Instant.now()), userId, token);
         if (updated == 0) jdbc.update("insert into fcm_tokens (id,user_id,token,platform,last_seen_at) values (?,?,?,?,?)", UUID.randomUUID(), userId, token, platform, Timestamp.from(Instant.now()));
@@ -199,5 +203,15 @@ public class PatientDataService {
     private Map<String,Object> planOutput(Map<String,Object> p) { return Map.of("id", p.get("id"), "plan_id", p.getOrDefault("plan_id", p.get("id")), "exercise", Map.ofEntries(Map.entry("id", p.get("exercise_id")), Map.entry("code", p.getOrDefault("exercise_code", "")), Map.entry("name", p.get("exercise_name")), Map.entry("category", p.getOrDefault("exercise_category", "")), Map.entry("name_key", p.getOrDefault("name_key", "")), Map.entry("description_key", p.getOrDefault("description_key", "")), Map.entry("instructions_key", p.getOrDefault("instructions_key", "")), Map.entry("safety_key", p.getOrDefault("safety_key", "")), Map.entry("difficulty", p.getOrDefault("difficulty", "beginner")), Map.entry("requires_support", p.getOrDefault("requires_support", false)), Map.entry("image_asset", p.get("image_asset") == null ? "" : p.get("image_asset"))), "target", Map.of("kind", "repetitions", "sets", p.get("sets"), "repetitions_per_set", p.get("repetitions_per_set"), "rest_seconds", p.get("rest_seconds")), "safe_config", Map.of("assistance_level", p.get("assistance_level")), "status", p.get("status"), "estimated_duration_seconds", p.get("estimated_duration_seconds")); }
     private Map<String,Object> exerciseOutput(Map<String,Object> e) { return Map.ofEntries(Map.entry("id", e.get("id")), Map.entry("code", e.get("code")), Map.entry("name", e.get("name")), Map.entry("category", e.get("category")), Map.entry("name_key", e.getOrDefault("name_key", "")), Map.entry("description_key", e.getOrDefault("description_key", "")), Map.entry("instructions_key", e.getOrDefault("instructions_key", "")), Map.entry("safety_key", e.getOrDefault("safety_key", "")), Map.entry("difficulty", e.getOrDefault("difficulty", "beginner")), Map.entry("requires_support", e.getOrDefault("requires_support", false)), Map.entry("image_asset", e.get("image_asset") == null ? "" : e.get("image_asset"))); }
     private Map<String,Object> deviceOutput(Map<String,Object> d) { var readiness=new LinkedHashMap<String,Object>(); readiness.put("state",d.get("readiness_state")); readiness.put("blocking_reasons", d.get("blocking_reasons")==null||d.get("blocking_reasons").toString().isBlank()?List.of():List.of(d.get("blocking_reasons"))); var output=new LinkedHashMap<String,Object>(); output.put("id",d.get("id")); output.put("serial_number",d.get("serial_number")); output.put("model",d.get("model")); output.put("firmware_version",d.get("firmware_version")); output.put("protocol_version",d.get("protocol_version")); output.put("online",d.get("online")); output.put("last_seen_at",d.get("last_seen_at")); output.put("battery_percent",d.get("battery_percent")); output.put("readiness",readiness); output.put("health",Map.of("sensors",d.get("sensors_state"),"motors",d.get("motors_state"),"controller",d.get("controller_state"),"estop",d.get("estop_state"))); output.put("calibration",Map.of("status",d.get("calibration_status"),"expires_at",d.get("calibration_expires_at"))); return output; }
-    private Map<String,Object> alertOutput(Map<String,Object> a) { return Map.of("id",a.get("id"),"severity",a.get("severity"),"title",a.get("title"),"occurred_at",a.get("occurred_at")); }
+    private Map<String,Object> alertOutput(Map<String,Object> a) {
+        var output = new LinkedHashMap<String, Object>();
+        output.put("id", a.get("id"));
+        output.put("severity", a.get("severity"));
+        output.put("title", a.get("title"));
+        output.put("message", a.getOrDefault("message", ""));
+        output.put("type", a.getOrDefault("type", "general"));
+        output.put("occurred_at", a.get("occurred_at"));
+        output.put("resolved_at", a.get("resolved_at"));
+        return output;
+    }
 }

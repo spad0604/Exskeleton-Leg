@@ -3,6 +3,7 @@ package com.example.leg.motions;
 import com.example.leg.shared.ApiException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.annotation.PostConstruct;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -13,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MotionRoutineService {
     private static final int MIN_REVERSE_REST_MS = 700;
+    @Value("${exo.motion.thigh-raise-low-ms:3000}")
+    private int thighRaiseLowMs = 3000;
+    @Value("${exo.motion.thigh-raise-high-ms:5000}")
+    private int thighRaiseHighMs = 5000;
+    @Value("${exo.motion.thigh-lower-ms:3000}")
+    private int thighLowerMs = 3000;
+    @Value("${exo.motion.knee-bend-low-ms:2000}")
+    private int kneeBendLowMs = 2000;
+    @Value("${exo.motion.knee-kick-low-ms:1500}")
+    private int kneeKickLowMs = 1500;
+    @Value("${exo.motion.knee-kick-high-ms:2500}")
+    private int kneeKickHighMs = 2500;
+    @Value("${exo.motion.default-rest-after-ms:1000}")
+    private int defaultRestAfterMs = 1000;
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
 
@@ -28,24 +44,45 @@ public class MotionRoutineService {
         this.objectMapper = objectMapper;
     }
 
+    @PostConstruct
+    void validateMotionConfiguration() {
+        for (int duration : List.of(thighRaiseLowMs, thighRaiseHighMs, thighLowerMs,
+                kneeBendLowMs, kneeKickLowMs, kneeKickHighMs)) {
+            if (duration < 1 || duration > 30000) {
+                throw new IllegalStateException("EXO motion duration must be between 1 and 30000 ms");
+            }
+        }
+        if (thighRaiseHighMs <= thighRaiseLowMs) {
+            throw new IllegalStateException("High thigh duration must be greater than low thigh duration");
+        }
+        if (kneeKickHighMs <= kneeKickLowMs) {
+            throw new IllegalStateException("High knee kick duration must be greater than low knee kick duration");
+        }
+        if (defaultRestAfterMs < MIN_REVERSE_REST_MS || defaultRestAfterMs > 10000) {
+            throw new IllegalStateException("EXO default rest must be between 700 and 10000 ms");
+        }
+    }
+
     public List<Map<String, Object>> library() {
         return List.of(
-                preset("thigh_raise_low", "Nâng đùi thấp", "C2", "OUT", 3000, "right", "hip"),
-                preset("thigh_raise_high", "Nâng đùi cao", "C2", "OUT", 5000, "right", "hip"),
-                preset("thigh_lower", "Hạ đùi", "C2", "IN", 3000, "right", "hip"),
-                preset("knee_bend_low", "Co gối thấp", "C1", "OUT", 2000, "right", "knee"),
-                preset("knee_kick_high", "Đá gối cao", "C1", "IN", 2500, "right", "knee"),
-                preset("left_thigh_raise_low", "Nâng đùi trái thấp", "C4", "OUT", 3000, "left", "hip"),
-                preset("left_thigh_raise_high", "Nâng đùi trái cao", "C4", "OUT", 5000, "left", "hip"),
-                preset("left_thigh_lower", "Hạ đùi trái", "C4", "IN", 3000, "left", "hip"),
-                preset("left_knee_bend_low", "Co gối trái thấp", "C3", "OUT", 2000, "left", "knee"),
-                preset("left_knee_kick_high", "Đá gối trái cao", "C3", "IN", 2500, "left", "knee"));
+                preset("thigh_raise_low", "Nâng đùi thấp", "C2", "OUT", thighRaiseLowMs, "right", "hip"),
+                preset("thigh_raise_high", "Nâng đùi cao", "C2", "OUT", thighRaiseHighMs, "right", "hip"),
+                preset("thigh_lower", "Hạ đùi", "C2", "IN", thighLowerMs, "right", "hip"),
+                preset("knee_bend_low", "Co gối thấp", "C1", "OUT", kneeBendLowMs, "right", "knee"),
+                preset("knee_kick_low", "Đá gối thấp", "C1", "IN", kneeKickLowMs, "right", "knee"),
+                preset("knee_kick_high", "Đá gối cao", "C1", "IN", kneeKickHighMs, "right", "knee"),
+                preset("left_thigh_raise_low", "Nâng đùi trái thấp", "C4", "OUT", thighRaiseLowMs, "left", "hip"),
+                preset("left_thigh_raise_high", "Nâng đùi trái cao", "C4", "OUT", thighRaiseHighMs, "left", "hip"),
+                preset("left_thigh_lower", "Hạ đùi trái", "C4", "IN", thighLowerMs, "left", "hip"),
+                preset("left_knee_bend_low", "Co gối trái thấp", "C3", "OUT", kneeBendLowMs, "left", "knee"),
+                preset("left_knee_kick_low", "Đá gối trái thấp", "C3", "IN", kneeKickLowMs, "left", "knee"),
+                preset("left_knee_kick_high", "Đá gối trái cao", "C3", "IN", kneeKickHighMs, "left", "knee"));
     }
 
     private Map<String, Object> preset(String code, String label, String motor, String direction,
             int durationMs, String side, String joint) {
         return Map.of("code", code, "label", label, "motor", motor, "direction", direction,
-                "duration_ms", durationMs, "default_rest_after_ms", 1000,
+                "duration_ms", durationMs, "default_rest_after_ms", defaultRestAfterMs,
                 "side", side, "joint", joint);
     }
 

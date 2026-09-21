@@ -1,5 +1,10 @@
 // EXO-SLT ESP32 controller (USB Type-C / CP210x serial).
-// GPIO13=previous, GPIO4=next, GPIO2=select/start (active-low INPUT_PULLUP).
+// Three external pull-up buttons, active LOW:
+// GPIO13 = previous exercise
+// GPIO34 = next exercise
+// GPIO35 = select/start; long press = stop and return HOME
+// GPIO34/GPIO35 are input-only pins, so the pull-up resistors must be
+// physically installed. Do not use INPUT_PULLUP on those pins.
 // OLED 0.96in SSD1306 128x64: I2C SDA=21, SCL=22, address=0x3C.
 // The commissioned cylinder drivers are controlled with timed phases. The
 // internal cylinder end stops provide the physical travel protection; every
@@ -23,8 +28,8 @@ static constexpr uint8_t MPU6050_ADDRESS = 0x68;
 static constexpr uint8_t MPU6050_CHANNEL = 4;
 static constexpr uint32_t IMU_SAMPLE_PERIOD_MS = 10; // 100 Hz
 static constexpr int BUTTON_PREVIOUS = 13;
-static constexpr int BUTTON_NEXT = 4;
-static constexpr int BUTTON_SELECT = 2;
+static constexpr int BUTTON_NEXT = 34;
+static constexpr int BUTTON_SELECT = 35;
 static constexpr int BATTERY_ADC_PIN = 14;  // D14, after 56k/10k divider
 static constexpr float BATTERY_DIVIDER_RATIO = (56.0f + 10.0f) / 10.0f;
 // 12V LiFePO4 (4S) profile. Voltage-only percentage is approximate because
@@ -84,7 +89,14 @@ uint32_t lastProgressStatusMs = 0;
 uint32_t lastRepetitionDurationMs = 0;
 uint32_t totalRepetitions = 0;
 bool exercisePaused = false;
-enum MotionPhase { PHASE_IDLE, PHASE_HOME, PHASE_HOME_REST, PHASE_RUN, PHASE_REST };
+enum MotionPhase {
+  PHASE_IDLE,
+  PHASE_HOME_DIRECTION_REST,
+  PHASE_HOME,
+  PHASE_HOME_REST,
+  PHASE_RUN,
+  PHASE_REST
+};
 MotionPhase motionPhase = PHASE_IDLE;
 bool homeAfterStop = false;
 String homeCompletionState;
@@ -205,6 +217,9 @@ void sendDeviceStatus() {
     ",\"estop_active\":" + (estopActive ? "true" : "false") +
     ",\"command_watchdog_ok\":false,\"imu_ready\":" + String(imuReady ? "true" : "false") +
     ",\"imu_channel\":" + String(MPU6050_CHANNEL) +
+    ",\"button_previous\":" + String(digitalRead(BUTTON_PREVIOUS)) +
+    ",\"button_next\":" + String(digitalRead(BUTTON_NEXT)) +
+    ",\"button_select\":" + String(digitalRead(BUTTON_SELECT)) +
     ",\"fault_reason\":\"" + faultReason + "\"}";
   sendPayload(payload);
 }
@@ -396,10 +411,12 @@ void finishExerciseRepetition() {
   if (completedSets >= targetSets) {
     activeAccumulatedMs += now - activeStartedMs;
     exerciseRunning = false;
-    motionPhase = PHASE_IDLE;
+    homeAfterStop = true;
+    homeCompletionState = "completed";
+    motionPhase = PHASE_HOME_DIRECTION_REST;
+    phaseStartedMs = millis();
     stopAllMotors();
-    sendStatus("completed", activeSession);
-    sendDeviceStatus();
+    sendStatus("extending", activeSession, "final HOME position");
     return;
   }
   exerciseStepIndex = 0;
@@ -411,15 +428,11 @@ void beginHomeReturn(bool afterStop) {
   homeCompletionState = afterStop ? "stopped" : "";
   exerciseRunning = false;
   exercisePaused = false;
-  motionPhase = PHASE_HOME;
+  // Never reverse directly. Stop for 700 ms before driving every cylinder IN.
+  motionPhase = PHASE_HOME_DIRECTION_REST;
   phaseStartedMs = millis();
   stopAllMotors();
-  setMotorDirection("C1", MOTOR_IN);
-  setMotorDirection("C2", MOTOR_IN);
-  setMotorDirection("C3", MOTOR_IN);
-  setMotorDirection("C4", MOTOR_IN);
-  for (uint8_t i = 0; i < 4; ++i) lastMotorDirection[i] = MOTOR_IN;
-  sendStatus("extending", activeSession,
+  sendStatus(afterStop ? "stopping" : "extending", activeSession,
              afterStop ? "returning all cylinders to HOME" : "initial HOME position");
 }
 
@@ -439,6 +452,9 @@ void handleMotorCommand(const String& payload) {
     return;
   }
   if (direction == "STOP" || durationMs == 0) { stopMotor(motor); return; }
+  if (exerciseRunning || exercisePaused || motionPhase != PHASE_IDLE) {
+    sendStatus("rejected", session, "controller is busy with another exercise"); return;
+  }
   if (activeMotor.length() > 0 && activeMotor != motor) {
     sendStatus("rejected", session, "another motor command is active"); return;
   }
@@ -467,13 +483,11 @@ void handleHomeCommand(const String& payload) {
   homeAfterStop = true;
   homeCompletionState = action == "prepare" ? "home_ready" :
                         (action == "complete" ? "completed" : "stopped");
-  motionPhase = PHASE_HOME;
+  motionPhase = PHASE_HOME_DIRECTION_REST;
   phaseStartedMs = millis();
   stopAllMotors();
-  setMotorDirection("C1", MOTOR_IN); setMotorDirection("C2", MOTOR_IN);
-  setMotorDirection("C3", MOTOR_IN); setMotorDirection("C4", MOTOR_IN);
-  for (uint8_t i = 0; i < 4; ++i) lastMotorDirection[i] = MOTOR_IN;
-  sendStatus("extending", activeSession, "returning all cylinders to HOME");
+  sendStatus(action == "stop" ? "stopping" : "extending", activeSession,
+             "returning all cylinders to HOME");
 }
 
 void updateMotorCommand() {
@@ -498,8 +512,16 @@ void sendSelection() {
   sendStatus("selected", "local-ui");
 }
 
+void sendButtonEvent(const char* button, const char* action) {
+  String payload = String("{\"v\":1,\"type\":\"button_event\",\"button\":\"") +
+    button + "\",\"action\":\"" + action + "\"}";
+  sendPayload(payload);
+}
+
 void startExercise() {
   activeSession = "local-ui";
+  targetSets = 1;
+  targetRepetitions = 1;
   completedRepetitions = 0;
   completedSets = 0;
   totalRepetitions = 0;
@@ -526,11 +548,24 @@ void startExercise() {
 }
 
 void stopExercise() {
+  if (activeSession.length() == 0) activeSession = "local-ui";
   if (exerciseRunning) activeAccumulatedMs += millis() - activeStartedMs;
   beginHomeReturn(true);
 }
 
 void updateExercise() {
+  if (motionPhase == PHASE_HOME_DIRECTION_REST) {
+    if (millis() - phaseStartedMs >= DIRECTION_REST_MS) {
+      setMotorDirection("C1", MOTOR_IN);
+      setMotorDirection("C2", MOTOR_IN);
+      setMotorDirection("C3", MOTOR_IN);
+      setMotorDirection("C4", MOTOR_IN);
+      for (uint8_t i = 0; i < 4; ++i) lastMotorDirection[i] = MOTOR_IN;
+      motionPhase = PHASE_HOME;
+      phaseStartedMs = millis();
+    }
+    return;
+  }
   if (motionPhase == PHASE_HOME) {
     if (millis() - phaseStartedMs >= HOME_RETURN_MS) {
       stopAllMotors();
@@ -604,17 +639,42 @@ void handleButton(ButtonState& button) {
   if (now - button.changedAt < DEBOUNCE_MS) return;
   if (reading != button.stableLevel) {
     button.stableLevel = reading;
-    if (reading == LOW) { button.pressedAt = now; button.longPressSent = false; }
-    else if (button.pin != BUTTON_SELECT) {
-      selectedExercise = button.pin == BUTTON_PREVIOUS
-        ? (selectedExercise + EXERCISE_COUNT - 1) % EXERCISE_COUNT
-        : (selectedExercise + 1) % EXERCISE_COUNT;
-      sendSelection();
-    } else if (!button.longPressSent) startExercise();
+    if (reading == LOW) {
+      button.pressedAt = now;
+      button.longPressSent = false;
+
+      if (button.pin == BUTTON_PREVIOUS || button.pin == BUTTON_NEXT) {
+        const char* name = button.pin == BUTTON_PREVIOUS ? "previous" : "next";
+        sendButtonEvent(name, "pressed");
+        if (exerciseRunning || exercisePaused || motionPhase != PHASE_IDLE ||
+            activeMotor.length() > 0) {
+          sendStatus("rejected", activeSession, "buttons locked while motion is active");
+        } else {
+          selectedExercise = button.pin == BUTTON_PREVIOUS
+            ? (selectedExercise + EXERCISE_COUNT - 1) % EXERCISE_COUNT
+            : (selectedExercise + 1) % EXERCISE_COUNT;
+          sendSelection();
+        }
+      } else {
+        sendButtonEvent("select", "pressed");
+      }
+    } else if (button.pin == BUTTON_SELECT && !button.longPressSent) {
+      // A short SELECT press starts the selected routine. A long press is
+      // consumed below and returns every cylinder to HOME.
+      sendButtonEvent("select", "short_press");
+      if (!exerciseRunning && !exercisePaused && motionPhase == PHASE_IDLE &&
+          activeMotor.length() == 0) {
+        startExercise();
+      } else {
+        sendStatus("rejected", activeSession, "exercise is already active");
+      }
+    }
   }
   if (button.pin == BUTTON_SELECT && button.stableLevel == LOW &&
       !button.longPressSent && now - button.pressedAt >= LONG_PRESS_MS) {
-    button.longPressSent = true; stopExercise();
+    button.longPressSent = true;
+    sendButtonEvent("select", "long_press_stop");
+    stopExercise();
   }
 }
 
@@ -684,7 +744,11 @@ void setup() {
   Wire.begin(21, 22);
   Wire.setClock(400000);
   imuReady = initMpu6050();
-  pinMode(BUTTON_PREVIOUS, INPUT_PULLUP); pinMode(BUTTON_NEXT, INPUT_PULLUP); pinMode(BUTTON_SELECT, INPUT_PULLUP);
+  // All three switches are externally pulled HIGH and connect the GPIO to
+  // GND when pressed. GPIO34/35 do not have internal pull-up capability.
+  pinMode(BUTTON_PREVIOUS, INPUT_PULLUP);
+  pinMode(BUTTON_NEXT, INPUT);
+  pinMode(BUTTON_SELECT, INPUT);
   pinMode(C1_PINS.in1, OUTPUT); pinMode(C1_PINS.in2, OUTPUT);
   pinMode(C2_PINS.in1, OUTPUT); pinMode(C2_PINS.in2, OUTPUT);
   pinMode(C3_PINS.in1, OUTPUT); pinMode(C3_PINS.in2, OUTPUT);

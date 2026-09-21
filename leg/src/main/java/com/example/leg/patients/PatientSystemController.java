@@ -89,6 +89,14 @@ public class PatientSystemController {
         return ApiResponse.of(patientData.progress(patientId, period));
     }
 
+    @GetMapping("/patients/{patientId}/alerts")
+    public ApiResponse<List<Map<String, Object>>> alerts(@PathVariable UUID patientId,
+            @RequestParam(defaultValue = "20") int limit,
+            @AuthenticationPrincipal AuthenticatedUser principal) {
+        relationships.requireCanView(principal, patientId);
+        return ApiResponse.of(patientData.alerts(patientId, Math.max(1, Math.min(limit, 100))));
+    }
+
     @PostMapping("/patients/{patientId}/training-sessions/complete")
     public ApiResponse<Map<String, Object>> completeTrainingSession(
             @PathVariable UUID patientId,

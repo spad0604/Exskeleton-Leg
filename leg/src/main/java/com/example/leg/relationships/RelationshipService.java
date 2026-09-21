@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.HashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,9 @@ public class RelationshipService {
 
     @Transactional
     public Map<String, Object> invite(UUID requesterId, String email) {
-        var requester = user(requesterId);
+        var requester = jdbc.queryForMap("select id, display_name, email_normalized from users where id=? and status='active'", requesterId);
+        var senderName = requester.get("display_name").toString();
+        var senderEmail = requester.get("email_normalized").toString();
         var target = jdbc.queryForMap("select id, display_name, email_normalized from users where email_normalized=? and status='active'", email.trim().toLowerCase());
         var targetId = (UUID) target.get("id");
         if (requesterId.equals(targetId)) throw invalid("Không thể liên kết tài khoản với chính mình.");
@@ -58,12 +61,16 @@ public class RelationshipService {
             var status = existing.get(0).get("status").toString();
             if ("active".equals(status)) throw new ApiException(HttpStatus.CONFLICT, "relationship.already_active", "Hai tài khoản đã được liên kết.");
             jdbc.update("update patient_caregiver_links set status='pending', requested_by=?, updated_at=? where patient_id=? and caregiver_id=?", requesterId, Timestamp.from(Instant.now()), patientId, caregiverId);
-            notifications.notifyUser(targetId, "Lời mời liên kết mới", "Bạn vừa nhận được lời mời liên kết trong Exoskeleton Leg.", Map.of("type", "relationship_invite", "link_id", existing.get(0).get("id").toString()));
+            notifications.notifyUser(targetId, "Lời mời theo dõi mới",
+                    senderName + " (" + senderEmail + ") muốn liên kết với bạn trong Exoskeleton Leg.",
+                    inviteData(existing.get(0).get("id").toString(), requesterId, senderName, senderEmail));
             return get((UUID) existing.get(0).get("id"));
         }
         var id = UUID.randomUUID();
         jdbc.update("insert into patient_caregiver_links (id, patient_id, caregiver_id, status, requested_by) values (?, ?, ?, 'pending', ?)", id, patientId, caregiverId, requesterId);
-        notifications.notifyUser(targetId, "Lời mời liên kết mới", "Bạn vừa nhận được lời mời liên kết trong Exoskeleton Leg.", Map.of("type", "relationship_invite", "link_id", id.toString()));
+        notifications.notifyUser(targetId, "Lời mời theo dõi mới",
+                senderName + " (" + senderEmail + ") muốn liên kết với bạn trong Exoskeleton Leg.",
+                inviteData(id.toString(), requesterId, senderName, senderEmail));
         return get(id);
     }
 
@@ -77,11 +84,13 @@ public class RelationshipService {
         if (!List.of("active", "rejected", "revoked").contains(status)) throw invalid("Trạng thái liên kết không hợp lệ.");
         jdbc.update("update patient_caregiver_links set status=?, updated_at=? where id=?", status, Timestamp.from(Instant.now()), linkId);
         if ("active".equals(status)) {
+            var accepterName = jdbc.queryForObject("select display_name from users where id=?", String.class, requesterId);
             notifications.notifyUser(
                     requesterId.equals(patientId) ? caregiverId : patientId,
                     "Liên kết đã được chấp nhận",
-                    "Mạng lưới chăm sóc của bạn đã được cập nhật.",
-                    Map.of("type", "relationship_active", "link_id", linkId.toString()));
+                    accepterName + " đã chấp nhận yêu cầu theo dõi của bạn.",
+                    Map.of("type", "relationship_active", "link_id", linkId.toString(),
+                            "actor_id", requesterId.toString(), "actor_name", accepterName));
         }
         return get(linkId);
     }
@@ -110,7 +119,15 @@ public class RelationshipService {
     }
 
     private Map<String, Object> get(UUID id) { return jdbc.queryForMap("select l.*, p.display_name patient_name, p.email_normalized patient_email, c.display_name caregiver_name, c.email_normalized caregiver_email from patient_caregiver_links l join users p on p.id=l.patient_id join users c on c.id=l.caregiver_id where l.id=?", id); }
-    private Map<String, Object> user(UUID id) { return jdbc.queryForMap("select id from users where id=? and status='active'", id); }
+    private Map<String, String> inviteData(String linkId, UUID senderId, String senderName, String senderEmail) {
+        var data = new HashMap<String, String>();
+        data.put("type", "relationship_invite");
+        data.put("link_id", linkId);
+        data.put("sender_id", senderId.toString());
+        data.put("sender_name", senderName);
+        data.put("sender_email", senderEmail);
+        return data;
+    }
     private boolean hasRole(UUID id, String role) { return jdbc.queryForObject("select count(*) from user_roles where user_id=? and role=?", Integer.class, id, role) > 0; }
     private ApiException denied() { return new ApiException(HttpStatus.FORBIDDEN, "authorization.denied", "Bạn không có quyền thực hiện thao tác này."); }
     private ApiException invalid(String message) { return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, "relationship.invalid", message); }

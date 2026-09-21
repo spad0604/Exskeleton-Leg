@@ -64,6 +64,18 @@ class ExerciseDeviceStatus {
       );
 }
 
+class ExoButtonEvent {
+  final String button;
+  final String action;
+
+  const ExoButtonEvent({required this.button, required this.action});
+
+  factory ExoButtonEvent.fromJson(Map<String, dynamic> json) => ExoButtonEvent(
+        button: json['button']?.toString() ?? '',
+        action: json['action']?.toString() ?? '',
+      );
+}
+
 class LiveDeviceStatus {
   final String state;
   final double batteryPercent;

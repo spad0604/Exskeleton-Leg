@@ -889,6 +889,28 @@ class _PatientNotificationsPageState extends State<PatientNotificationsPage> {
     _future = provider.get<NetworkDataSource>().getNotifications();
   }
 
+  Future<void> _relationshipAction(String linkId, String action) async {
+    try {
+      await provider
+          .get<NetworkDataSource>()
+          .updateRelationship(linkId, action);
+      if (mounted) {
+        setState(_load);
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(action == 'accept'
+              ? 'Đã chấp nhận yêu cầu theo dõi.'
+              : 'Đã từ chối yêu cầu theo dõi.'),
+        ));
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể cập nhật yêu cầu: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Map<String, dynamic>>>(
@@ -915,17 +937,25 @@ class _PatientNotificationsPageState extends State<PatientNotificationsPage> {
         final items =
             (snapshot.data ?? const <Map<String, dynamic>>[]).map((item) {
           final severity = item['severity'] as String? ?? 'info';
+          final type = item['type']?.toString() ?? '';
           return _NotificationItem(
-            icon: severity == 'warning'
-                ? Icons.warning_amber_rounded
-                : Icons.notifications,
+            icon: type == 'relationship_invite'
+                ? Icons.person_add_alt_1_rounded
+                : severity == 'warning'
+                    ? Icons.warning_amber_rounded
+                    : Icons.notifications,
             title: item['title'] as String? ?? '',
-            body: item['title'] as String? ?? '',
+            body: item['message'] as String? ?? '',
             time: item['occurred_at'] as String? ?? '',
             tone: severity == 'critical'
                 ? _AccentTone.tertiary
                 : _AccentTone.primary,
-            unread: item['resolved_at'] == null,
+            unread: item['source'] == 'inbox'
+                ? item['read_at'] == null
+                : item['resolved_at'] == null,
+            relationshipInvite: type == 'relationship_invite',
+            linkId: item['link_id']?.toString(),
+            onRelationshipAction: _relationshipAction,
           );
         }).toList();
         return _PatientTabScaffold(
@@ -2813,7 +2843,14 @@ class _ProfileHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer,
+        gradient: LinearGradient(
+          colors: [
+            colorScheme.primaryContainer,
+            colorScheme.secondaryContainer
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
       ),
       child: Row(
@@ -2827,11 +2864,11 @@ class _ProfileHeader extends StatelessWidget {
                 foregroundImage:
                     avatarUrl == null ? null : NetworkImage(avatarUrl!),
                 child: avatarUrl == null
-                    ? Text(
-                        displayName.characters.first.toUpperCase(),
-                        style: textTheme.headlineMedium?.copyWith(
-                          color: colorScheme.onPrimary,
-                          fontWeight: FontWeight.w800,
+                    ? Padding(
+                        padding: const EdgeInsets.all(7),
+                        child: Image.asset(
+                          'assets/images/gen_assets/asset_profile.png',
+                          fit: BoxFit.contain,
                         ),
                       )
                     : null,
@@ -3171,6 +3208,26 @@ class _NotificationBlock extends StatelessWidget {
                     style: TextStyle(color: colorScheme.onSurfaceVariant),
                   ),
                   const SizedBox(height: 12),
+                  if (item.relationshipInvite && item.linkId != null) ...[
+                    Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => item.onRelationshipAction
+                              ?.call(item.linkId!, 'reject'),
+                          child: const Text('Từ chối'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => item.onRelationshipAction
+                              ?.call(item.linkId!, 'accept'),
+                          child: const Text('Chấp nhận'),
+                        ),
+                      ),
+                    ]),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       _MetaPill(
@@ -3198,6 +3255,10 @@ class _NotificationItem {
   final String time;
   final _AccentTone tone;
   final bool unread;
+  final bool relationshipInvite;
+  final String? linkId;
+  final Future<void> Function(String linkId, String action)?
+      onRelationshipAction;
 
   const _NotificationItem({
     required this.icon,
@@ -3206,6 +3267,9 @@ class _NotificationItem {
     required this.time,
     required this.tone,
     required this.unread,
+    this.relationshipInvite = false,
+    this.linkId,
+    this.onRelationshipAction,
   });
 }
 

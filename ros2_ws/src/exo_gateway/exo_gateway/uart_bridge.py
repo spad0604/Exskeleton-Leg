@@ -54,12 +54,18 @@ class UartBridge(Node):
         self._serial = None
         self._serial_lock = threading.Lock()
         self._stop = threading.Event()
+        self._last_valid_rx = 0.0
+        self._invalid_rx_since = 0.0
         # UART is only a telemetry source.  SafetyGateway is the single
         # authoritative publisher of /exo/state; publishing there directly
         # would make consumers receive alternating Pi/ESP32 snapshots.
         self._state_pub = self.create_publisher(DeviceState, '/exo/state/raw', 10)
         self._exercise_status_pub = self.create_publisher(ExerciseStatus, '/exo/exercise/status', 10)
         self._imu_pub = self.create_publisher(ImuSample, '/exo/imu', 100)
+        # Local ESP32 controls are useful to the app/logger as well as to the
+        # operator. Keep the raw JSON so future consumers do not need a new
+        # interface message for every button action.
+        self._button_event_pub = self.create_publisher(String, '/exo/button/event', 10)
         self.create_subscription(DeviceCommand, '/exo/command/accepted', self._on_device_command, 10)
         self.create_subscription(ExerciseCommand, '/exo/exercise/accepted', self._on_exercise_command, 10)
         self.create_subscription(String, '/exo/routine/accepted', self._on_routine_command, 10)
@@ -77,11 +83,43 @@ class UartBridge(Node):
             import serial
             device = str(self.get_parameter('device').value)
             baudrate = int(self.get_parameter('baudrate').value)
-            self._serial = serial.Serial(device, baudrate=baudrate, timeout=0.5, write_timeout=0.5)
+            # Opening a CP210x can toggle DTR/RTS and accidentally hold an
+            # ESP32 in reset/bootloader. Force both lines inactive, then give
+            # the board time to finish booting before using the stream.
+            port = serial.Serial(
+                device, baudrate=baudrate, timeout=0.5, write_timeout=0.5,
+                rtscts=False, dsrdtr=False, exclusive=True,
+            )
+            port.rts = False
+            port.dtr = False
+            time.sleep(1.5)
+            port.reset_input_buffer()
+            self._serial = port
+            self._last_valid_rx = time.monotonic()
+            self._invalid_rx_since = 0.0
             self.get_logger().info(f'Connected ESP32 USB serial at {device} ({baudrate} baud)')
+            # A harmless handshake confirms that the ESP32 is alive. It also
+            # makes startup deterministic when the Pi came up before USB.
+            self._send({'type': 'ping'})
         except Exception as error:  # pyserial reports several OS-specific errors
+            try:
+                if self._serial is not None:
+                    self._serial.close()
+            except Exception:
+                pass
             self._serial = None
             self.get_logger().warning(f'ESP32 UART unavailable: {error}')
+
+    def _disconnect(self, reason):
+        with self._serial_lock:
+            serial_port = self._serial
+            self._serial = None
+        if serial_port is not None:
+            try:
+                serial_port.close()
+            except Exception:
+                pass
+        self.get_logger().warning(f'ESP32 UART reconnect scheduled: {reason}')
 
     def _send(self, payload):
         with self._serial_lock:
@@ -276,12 +314,19 @@ class UartBridge(Node):
                 self._status_condition.notify_all()
             self._exercise_status_pub.publish(status)
             if (status.session_id == self._active_routine_session):
-                if status.state in ('rejected', 'not_ready'):
+                if status.state == 'stopping':
+                    # A physical long-press on ESP32 must stop the Pi runner
+                    # before it can transmit another timed motor step.
+                    self._routine_stop.set()
+                elif status.state in ('rejected', 'not_ready'):
                     self._routine_stop.set()
                     with self._routine_io_lock:
                         self._send({'type': 'home_command', 'action': 'stop',
                                     'session_id': status.session_id})
-                elif status.state in ('completed', 'stopped'):
+                elif status.state == 'stopped':
+                    self._routine_stop.set()
+                    self._active_routine_session = None
+                elif status.state == 'completed':
                     self._active_routine_session = None
         elif kind == 'exercise_selected':
             exercise_code = str(payload.get('exercise_code', ''))[:64]
@@ -301,6 +346,21 @@ class UartBridge(Node):
             status.total_repetitions = 0
             status.target_total_repetitions = 0
             self._exercise_status_pub.publish(status)
+        elif kind == 'button_event':
+            button = str(payload.get('button', ''))[:32]
+            action = str(payload.get('action', ''))[:32]
+            if button not in ('previous', 'next', 'select'):
+                self.get_logger().warning(f'Ignoring invalid ESP32 button event: {payload}')
+                return
+            event = String()
+            event.data = json.dumps({
+                'v': 1,
+                'type': 'button_event',
+                'button': button,
+                'action': action,
+            }, separators=(',', ':'))
+            self._button_event_pub.publish(event)
+            self.get_logger().info(f'ESP32 button {button}: {action}')
         else:
             self.get_logger().warning(f'Ignoring unknown ESP32 UART message: {kind}')
 
@@ -314,13 +374,12 @@ class UartBridge(Node):
             try:
                 line = self._serial.readline()
                 if not line:
+                    if time.monotonic() - self._last_valid_rx >= 5.0:
+                        self._disconnect('no valid EXO1 frame for 5 seconds')
                     continue
             except Exception as error:
                 self.get_logger().warning(f'UART read failed: {error}')
-                try:
-                    self._serial.close()
-                finally:
-                    self._serial = None
+                self._disconnect(str(error))
                 continue
             try:
                 payload = decode_frame(line)
@@ -328,9 +387,23 @@ class UartBridge(Node):
                 # USB-UART ESP32 boot messages and monitor text are not
                 # protocol frames. Ignore them without resetting the port.
                 self.get_logger().debug(f'Ignoring non-protocol USB input: {error}')
+                now = time.monotonic()
+                if self._invalid_rx_since == 0.0:
+                    self._invalid_rx_since = now
+                # Continuous garbage normally means that the ESP32 and Pi
+                # are not synchronized (boot timing, stale USB state, or
+                # wrong firmware/baud). Reopen the port automatically; this
+                # is the same recovery a physical unplug/replug provides.
+                if now - self._invalid_rx_since >= 3.0:
+                    self._disconnect('no valid EXO1 frame for 3 seconds')
                 continue
             try:
-                self.get_logger().info(f"UART RX {payload.get('type', 'unknown')}")
+                self._last_valid_rx = time.monotonic()
+                self._invalid_rx_since = 0.0
+                # IMU arrives at 100 Hz. Logging every sample floods journald
+                # and can starve the BLE event loop on a Raspberry Pi.
+                if payload.get('type') != 'imu_sample':
+                    self.get_logger().info(f"UART RX {payload.get('type', 'unknown')}")
                 self._handle_rx(payload)
             except Exception as error:
                 self.get_logger().warning(f'UART frame handling failed: {error}')

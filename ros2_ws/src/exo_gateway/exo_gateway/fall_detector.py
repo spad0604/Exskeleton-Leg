@@ -49,11 +49,16 @@ class FallDetector(Node):
             from tflite_runtime.interpreter import Interpreter
         except ImportError:
             try:
-                from tensorflow.lite import Interpreter
+                # ai-edge-litert provides ARM64 wheels for newer Python
+                # versions where the older tflite-runtime package is absent.
+                from ai_edge_litert.interpreter import Interpreter
             except ImportError as error:
-                raise RuntimeError(
-                    'Install tflite-runtime or tensorflow on the Pi'
-                ) from error
+                try:
+                    from tensorflow.lite import Interpreter
+                except ImportError:
+                    raise RuntimeError(
+                        'Install ai-edge-litert, tflite-runtime, or tensorflow on the Pi'
+                    ) from error
         return Interpreter(model_path=str(model_path), num_threads=4)
 
     def _on_sample(self, sample):

@@ -29,10 +29,12 @@ class ExoBleService {
   final _status = StreamController<ExerciseDeviceStatus>.broadcast();
   final _deviceStatus = StreamController<LiveDeviceStatus>.broadcast();
   final _fallAlerts = StreamController<FallAlert>.broadcast();
+  final _buttonEvents = StreamController<ExoButtonEvent>.broadcast();
 
   Stream<ExerciseDeviceStatus> get status => _status.stream;
   Stream<LiveDeviceStatus> get deviceStatus => _deviceStatus.stream;
   Stream<FallAlert> get fallAlerts => _fallAlerts.stream;
+  Stream<ExoButtonEvent> get buttonEvents => _buttonEvents.stream;
   bool get isConnected => _control != null;
 
   Future<List<ExoBleDevice>> discoverExoskeletons() async {
@@ -199,6 +201,8 @@ class ExoBleService {
           final type = payload['type'];
           if (type == 'exercise_status') {
             _status.add(ExerciseDeviceStatus.fromJson(payload));
+          } else if (type == 'button_event') {
+            _buttonEvents.add(ExoButtonEvent.fromJson(payload));
           } else if (type == 'device_status') {
             _deviceStatus.add(LiveDeviceStatus.fromJson(payload));
           } else if (type == 'fall_alert') {
@@ -503,6 +507,7 @@ class ExoBleService {
     await _status.close();
     await _deviceStatus.close();
     await _fallAlerts.close();
+    await _buttonEvents.close();
   }
 }
 

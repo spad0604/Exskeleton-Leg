@@ -2,14 +2,16 @@
 
 `exo_controller.ino` is the ESP32 local UI and commissioning controller. Use a
 USB Type-C data cable from the ESP32 to the Pi. The CP210x bridge appears on
-the Pi as `/dev/ttyUSB0`, at 115200 baud, 8N1. No Pi GPIO UART wiring is used.
+the Pi as `/dev/ttyUSB0`, at 921600 baud, 8N1. No Pi GPIO UART wiring is used.
 
 ## Local controls
 
-The three buttons connect from the GPIO to GND and are configured as
-`INPUT_PULLUP` (pressed = LOW): GPIO13 = previous, GPIO4 = next, GPIO2 =
-short press start and hold 1.2 seconds stop. GPIO2 is a boot-strapping pin on
-many ESP32 boards; do not hold it while powering up. The 0.96-inch SSD1306
+The three buttons connect from the GPIO to GND and are active LOW:
+GPIO13 = previous, GPIO34 = next, GPIO35 = short press start and hold 1.2
+seconds stop/return HOME. GPIO13 uses its internal pull-up. GPIO34 and GPIO35
+are input-only, so they require physical pull-up resistors. Selection and a
+short start are locked while motion is active; long-stop remains available.
+The 0.96-inch SSD1306
 OLED uses I2C SDA=21, SCL=22 and address `0x3C`. Install `Adafruit GFX
 Library` and `Adafruit SSD1306`; without them the UART controller still runs
 without the display.

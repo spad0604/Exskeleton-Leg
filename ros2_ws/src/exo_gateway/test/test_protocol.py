@@ -1,9 +1,18 @@
 import base64
 import json
+import threading
 import unittest
 
 from exo_gateway.ble_bridge import BleBridge
-from exo_gateway.uart_bridge import decode_frame, encode_frame
+from exo_gateway.uart_bridge import UartBridge, decode_frame, encode_frame
+
+
+class _Publisher:
+    def __init__(self):
+        self.messages = []
+
+    def publish(self, message):
+        self.messages.append(message)
 
 
 class ProtocolTests(unittest.TestCase):
@@ -52,3 +61,23 @@ class ProtocolTests(unittest.TestCase):
         node._handle_routine_commit({'transfer_id': 'transfer-1'})
 
         self.assertEqual([routine], captured)
+
+    def test_physical_stop_status_cancels_the_active_routine_runner(self):
+        node = object.__new__(UartBridge)
+        node._status_condition = threading.Condition()
+        node._last_exercise_status = {}
+        node._exercise_status_pub = _Publisher()
+        node._active_routine_session = 'routine-test'
+        node._routine_stop = threading.Event()
+        node._routine_io_lock = threading.Lock()
+
+        node._handle_rx({
+            'type': 'exercise_status',
+            'session_id': 'routine-test',
+            'exercise_code': 'custom_routine',
+            'state': 'stopping',
+            'reason': 'physical button',
+        })
+
+        self.assertTrue(node._routine_stop.is_set())
+        self.assertEqual('stopping', node._exercise_status_pub.messages[0].state)

@@ -20,29 +20,28 @@ class AppRouter extends RootStackRouter {
 
   @override
   List<AutoRoute> get routes => [
-    AutoRoute(path: '/', page: SplashRoute.page),
-    AutoRoute(path: '/auth/login', page: LoginRoute.page),
-    AutoRoute(path: '/auth/register', page: RegisterRoute.page),
-    AutoRoute(path: '/caregiver', page: CaregiverShellRoute.page),
-    AutoRoute(
-      path: '/patient',
-      page: PatientShellRoute.page,
-      children: [
-        AutoRoute(path: 'home', page: HomeRoute.page),
-        AutoRoute(path: 'training', page: TrainingRoute.page),
-        AutoRoute(path: 'progress', page: ProgressRoute.page),
-        AutoRoute(path: 'device', page: DeviceRoute.page),
-        AutoRoute(path: 'profile', page: ProfileRoute.page),
-        RedirectRoute(path: '', redirectTo: 'home'),
-      ],
-    ),
-  ];
+        AutoRoute(path: '/', page: SplashRoute.page),
+        AutoRoute(path: '/auth/login', page: LoginRoute.page),
+        AutoRoute(path: '/auth/register', page: RegisterRoute.page),
+        AutoRoute(path: '/caregiver', page: CaregiverShellRoute.page),
+        AutoRoute(
+          path: '/patient',
+          page: PatientShellRoute.page,
+          children: [
+            AutoRoute(path: 'home', page: HomeRoute.page),
+            AutoRoute(path: 'training', page: TrainingRoute.page),
+            AutoRoute(path: 'progress', page: ProgressRoute.page),
+            AutoRoute(path: 'device', page: DeviceRoute.page),
+            AutoRoute(path: 'profile', page: ProfileRoute.page),
+            RedirectRoute(path: '', redirectTo: 'home'),
+          ],
+        ),
+      ];
 
   bool isUnauthorizedRoute(String routeName) =>
       [LoginRoute.name, RegisterRoute.name].contains(routeName);
 
-  bool isAuthorizedRoute(String routeName) =>
-      [
+  bool isAuthorizedRoute(String routeName) => [
         PatientShellRoute.name,
         CaregiverShellRoute.name,
         HomeRoute.name,
@@ -54,20 +53,42 @@ class AppRouter extends RootStackRouter {
 
   @override
   List<AutoRouteGuard> get guards => [
-    AutoRouteGuard.simple((resolver, router) {
-      final isAuthenticated = _authBloc.state.loggedIn;
+        AutoRouteGuard.simple((resolver, router) {
+          final isAuthenticated = _authBloc.state.loggedIn;
 
-      if (isAuthorizedRoute(resolver.routeName) && !isAuthenticated) {
-        return resolver.redirect(LoginRoute(), replace: true);
-      }
+          if (isAuthorizedRoute(resolver.routeName) && !isAuthenticated) {
+            return resolver.redirect(LoginRoute(), replace: true);
+          }
 
-      if (isUnauthorizedRoute(resolver.routeName) && isAuthenticated) {
-        return resolver.redirect(const PatientShellRoute(), replace: true);
-      }
+          if (isUnauthorizedRoute(resolver.routeName) && isAuthenticated) {
+            final isCaregiver =
+                _authBloc.state.account?.roles.contains('caregiver') ?? false;
+            return resolver.redirect(
+              isCaregiver
+                  ? const CaregiverShellRoute()
+                  : const PatientShellRoute(),
+              replace: true,
+            );
+          }
 
-      resolver.next(true);
-    }),
-  ];
+          final isPatientRoute = [
+            PatientShellRoute.name,
+            HomeRoute.name,
+            TrainingRoute.name,
+            ProgressRoute.name,
+            DeviceRoute.name,
+            ProfileRoute.name,
+          ].contains(resolver.routeName);
+          final isCaregiver =
+              _authBloc.state.account?.roles.contains('caregiver') ?? false;
+          if (isPatientRoute && isCaregiver) {
+            return resolver.redirect(const CaregiverShellRoute(),
+                replace: true);
+          }
+
+          resolver.next(true);
+        }),
+      ];
 
   @override
   RouteType get defaultRouteType => const RouteType.adaptive();

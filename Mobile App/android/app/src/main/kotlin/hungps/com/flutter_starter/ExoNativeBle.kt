@@ -44,7 +44,10 @@ class ExoNativeBle(
         private const val CCCD = "00002902-0000-1000-8000-00805f9b34fb"
         private const val TIMEOUT_MS = 20_000L
         private const val OPERATION_TIMEOUT_MS = 8_000L
-        private const val REQUESTED_MTU = 512
+        // Android 14+ can negotiate the ATT MTU automatically immediately
+        // after connecting. Starting service discovery at the same time can
+        // leave BlueZ without an onServicesDiscovered callback.
+        private const val DISCOVERY_FALLBACK_MS = 1_000L
 
         private val serviceUuid = UUID.fromString(SERVICE)
         private val controlUuid = UUID.fromString(CONTROL)
@@ -186,13 +189,10 @@ class ExoNativeBle(
                 return
             }
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                // Keep the supervision link active while the Pi sends status
-                // notifications and the phone changes Flutter routes.
-                gatt.requestConnectionPriority(BluetoothGatt.CONNECTION_PRIORITY_HIGH)
                 if (gatt.device.bondState == BluetoothDevice.BOND_BONDING) {
                     waitForBondThenDiscover(gatt)
                 } else {
-                    negotiateMtuThenDiscover(gatt)
+                    scheduleDiscovery(gatt)
                 }
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
                 failConnection("GATT disconnected (status=$statusCode)")
@@ -274,14 +274,8 @@ class ExoNativeBle(
         if (!currentGatt.discoverServices()) failConnect("BluetoothGatt.discoverServices returned false")
     }
 
-    private fun negotiateMtuThenDiscover(currentGatt: BluetoothGatt) {
-        if (currentGatt !== gatt) return
-        val requested = currentGatt.requestMtu(REQUESTED_MTU)
-        if (!requested) {
-            discover(currentGatt)
-            return
-        }
-        main.postDelayed({ discover(currentGatt) }, 1_200L)
+    private fun scheduleDiscovery(currentGatt: BluetoothGatt) {
+        main.postDelayed({ discover(currentGatt) }, DISCOVERY_FALLBACK_MS)
     }
 
     private fun waitForBondThenDiscover(currentGatt: BluetoothGatt) {
@@ -294,7 +288,7 @@ class ExoNativeBle(
                 if (state == BluetoothDevice.BOND_NONE || state == BluetoothDevice.BOND_BONDED) {
                     activity.unregisterReceiver(this)
                     bondReceiver = null
-                    negotiateMtuThenDiscover(currentGatt)
+                    scheduleDiscovery(currentGatt)
                 }
             }
         }

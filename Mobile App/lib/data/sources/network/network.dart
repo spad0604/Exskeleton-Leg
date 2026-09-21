@@ -70,6 +70,15 @@ class NetworkDataSource {
     return _data(response.data);
   }
 
+  Future<List<Map<String, dynamic>>> getPatientAlerts(String patientId,
+      {int limit = 20}) async {
+    final response = await _dio.get<Map<String, dynamic>>(
+      'patients/$patientId/alerts',
+      queryParameters: {'limit': limit},
+    );
+    return _dataList(response.data);
+  }
+
   Future<Map<String, dynamic>> completeTrainingSession({
     required String patientId,
     required String sessionId,

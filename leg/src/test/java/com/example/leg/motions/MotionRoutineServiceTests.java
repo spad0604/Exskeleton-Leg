@@ -54,6 +54,25 @@ class MotionRoutineServiceTests {
         assertEquals(true, steps.get(1).get("return_home"));
     }
 
+    @Test
+    void preservesBackendSelectedMotionDurations() {
+        var steps = service.validateAndNormalize(List.of(
+                step("Nâng đùi cao", "C2", "OUT", 4700, 900),
+                step("Hạ đùi", "C2", "IN", 3200, 1000)),
+                "ONE_LEG", "RIGHT");
+
+        assertEquals(4700, steps.get(0).get("duration_ms"));
+        assertEquals(3200, steps.get(1).get("duration_ms"));
+    }
+
+    @Test
+    void motionLibraryUsesBackendDefaults() {
+        var library = service.library();
+        assertEquals(3000, library.get(0).get("duration_ms"));
+        assertEquals(5000, library.get(1).get("duration_ms"));
+        assertEquals(1000, library.get(1).get("default_rest_after_ms"));
+    }
+
     private MotionRoutineService.StepRequest step(
             String label, String motor, String direction, int duration, int rest) {
         return new MotionRoutineService.StepRequest(label, motor, direction, duration, rest, 1);

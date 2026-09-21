@@ -39,7 +39,24 @@ class BleBridge(Node):
         self._routine_pub = self.create_publisher(String, '/exo/routine/request', 10)
         self.create_subscription(ExerciseStatus, '/exo/exercise/status', self._on_status, 10)
         self.create_subscription(DeviceState, '/exo/state', self._on_device_state, 10)
+        self.create_subscription(String, '/exo/button/event', self._on_button_event, 10)
         self.create_subscription(FallAlert, '/exo/fall/alert', self._on_fall_alert, 10)
+
+    def _on_button_event(self, message):
+        try:
+            payload = json.loads(message.data)
+            button = str(payload.get('button', ''))
+            action = str(payload.get('action', ''))
+            if button not in ('previous', 'next', 'select') or not action:
+                return
+        except (TypeError, json.JSONDecodeError):
+            return
+        self._queue_status({
+            'v': 1,
+            'type': 'button_event',
+            'button': button,
+            'action': action,
+        })
 
     def _on_fall_alert(self, alert):
         # Safety events are forwarded immediately and are never rate-limited
