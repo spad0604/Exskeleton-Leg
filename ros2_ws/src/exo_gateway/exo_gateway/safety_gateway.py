@@ -39,6 +39,8 @@ class SafetyGateway(Node):
         self.create_subscription(ExerciseCommand, '/exo/exercise/request', self._on_exercise_request, 10)
         self._routine_accepted_pub = self.create_publisher(String, '/exo/routine/accepted', 10)
         self.create_subscription(String, '/exo/routine/request', self._on_routine_request, 10)
+        self._manual_accepted_pub = self.create_publisher(String, '/exo/manual/accepted', 10)
+        self.create_subscription(String, '/exo/manual/request', self._on_manual_request, 10)
         self._exercise_status_pub = self.create_publisher(ExerciseStatus, '/exo/exercise/status', 10)
         self.create_timer(0.1, self._publish_state)
 
@@ -193,6 +195,38 @@ class SafetyGateway(Node):
         except (ValueError, TypeError, json.JSONDecodeError) as error:
             self.get_logger().warning(f'Rejected routine: {error}')
             self._publish_routine_status(session_id, 'rejected', str(error))
+
+    def _on_manual_request(self, message):
+        try:
+            payload = json.loads(message.data)
+            action = str(payload.get('action', ''))
+            if action == 'stop':
+                accepted = String()
+                accepted.data = json.dumps(
+                    {'v': 1, 'type': 'manual_command', 'action': 'stop'},
+                    separators=(',', ':'))
+                self._manual_accepted_pub.publish(accepted)
+                return
+            motor = str(payload.get('motor', ''))
+            direction = str(payload.get('direction', ''))
+            duration = int(payload.get('duration_ms', 0))
+            if self._estop_active() and not self._commissioning_mode():
+                raise ValueError('E-stop active or hardware adapter not configured')
+            if motor not in ('C1', 'C2', 'C3', 'C4'):
+                raise ValueError('unsupported manual motor')
+            if direction not in ('OUT', 'IN'):
+                raise ValueError('unsupported manual direction')
+            if duration not in (5000, 7000):
+                raise ValueError('manual duration must be 5000ms or 7000ms')
+            accepted = String()
+            accepted.data = json.dumps({
+                'v': 1, 'type': 'manual_command', 'action': 'move',
+                'motor': motor, 'direction': direction,
+                'duration_ms': duration,
+            }, separators=(',', ':'))
+            self._manual_accepted_pub.publish(accepted)
+        except (ValueError, TypeError, json.JSONDecodeError) as error:
+            self.get_logger().warning(f'Rejected manual command: {error}')
 
     def _publish_routine_status(self, session_id, state, reason=''):
         status = ExerciseStatus()

@@ -433,6 +433,35 @@ class ExoBleService {
     await acknowledgement;
   }
 
+  Future<void> sendManualMotor({
+    required String motor,
+    required String direction,
+    required int durationMs,
+  }) async {
+    if (durationMs != 5000 && durationMs != 7000) {
+      throw ArgumentError('Manual duration must be 5000ms or 7000ms');
+    }
+    if (!const {'C1', 'C2', 'C3', 'C4'}.contains(motor)) {
+      throw ArgumentError('Unsupported motor');
+    }
+    if (!const {'OUT', 'IN'}.contains(direction)) {
+      throw ArgumentError('Unsupported direction');
+    }
+    await connect();
+    await _write({
+      'type': 'manual_command',
+      'action': 'move',
+      'motor': motor,
+      'direction': direction,
+      'duration_ms': durationMs,
+    });
+  }
+
+  Future<void> stopManualMotors() async {
+    if (!isConnected) return;
+    await _write({'type': 'manual_command', 'action': 'stop'});
+  }
+
   Future<void> _sendExerciseCommand({
     required String sessionId,
     required String exerciseCode,

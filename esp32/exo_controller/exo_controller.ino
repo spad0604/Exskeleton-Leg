@@ -353,33 +353,33 @@ void buildExercisePlan() {
   const String code = EXERCISES[selectedExercise].code;
 
   if (code == "raise_right_leg") {
-    addExerciseStep(MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 3000);
-    addExerciseStep(MOTOR_STOP, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 3000);
+    addExerciseStep(MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 7000);
+    addExerciseStep(MOTOR_STOP, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 5000);
   } else if (code == "raise_left_leg") {
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, 3000);
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, MOTOR_IN, 3000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, 7000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, MOTOR_IN, 5000);
   } else if (code == "kick_right_knee") {
-    addExerciseStep(MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, 2000);
-    addExerciseStep(MOTOR_IN, MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, 2500);
+    addExerciseStep(MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, 5000);
+    addExerciseStep(MOTOR_IN, MOTOR_STOP, MOTOR_STOP, MOTOR_STOP, 7000);
   } else if (code == "kick_left_knee") {
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, 2000);
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_STOP, 2500);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, 5000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_STOP, 7000);
   } else if (code == "kick_right_leg") {
-    addExerciseStep(MOTOR_OUT, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 2000);
-    addExerciseStep(MOTOR_IN, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 3000);
+    addExerciseStep(MOTOR_OUT, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 7000);
+    addExerciseStep(MOTOR_IN, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 5000);
   } else if (code == "kick_left_leg") {
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_OUT, 2000);
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_IN, 3000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_OUT, 7000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_IN, 5000);
   } else if (code == "walk") {
     // One repetition is a right step followed by a left step. Both legs
     // finish at IN/home before the next repetition.
-    addExerciseStep(MOTOR_OUT, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 2000);
-    addExerciseStep(MOTOR_IN, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 2500);
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_OUT, 2000);
-    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_IN, 2500);
+    addExerciseStep(MOTOR_OUT, MOTOR_OUT, MOTOR_STOP, MOTOR_STOP, 7000);
+    addExerciseStep(MOTOR_IN, MOTOR_IN, MOTOR_STOP, MOTOR_STOP, 5000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_OUT, MOTOR_OUT, 7000);
+    addExerciseStep(MOTOR_STOP, MOTOR_STOP, MOTOR_IN, MOTOR_IN, 5000);
   } else if (code == "sit_to_stand") {
-    addExerciseStep(MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, MOTOR_OUT, 3000);
-    addExerciseStep(MOTOR_STOP, MOTOR_IN, MOTOR_STOP, MOTOR_IN, 3000);
+    addExerciseStep(MOTOR_STOP, MOTOR_OUT, MOTOR_STOP, MOTOR_OUT, 7000);
+    addExerciseStep(MOTOR_STOP, MOTOR_IN, MOTOR_STOP, MOTOR_IN, 5000);
   }
 }
 
@@ -459,6 +459,13 @@ void handleMotorCommand(const String& payload) {
     sendStatus("rejected", session, "another motor command is active"); return;
   }
   const MotorDirection requested = direction == "OUT" ? MOTOR_OUT : MOTOR_IN;
+  if (activeMotor == motor &&
+      static_cast<int32_t>(millis() - activeMotorUntilMs) < 0 &&
+      requested != lastMotorDirection[index]) {
+    sendStatus("rejected", session,
+               "motor is still moving; STOP is required before reverse");
+    return;
+  }
   if (requested == lastMotorDirection[index]) {
     sendStatus("rejected", session, "joint is already in requested state"); return;
   }

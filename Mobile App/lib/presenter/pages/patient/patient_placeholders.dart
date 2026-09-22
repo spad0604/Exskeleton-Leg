@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:auto_route/auto_route.dart';
 import 'package:easy_localization/easy_localization.dart';
@@ -1868,6 +1869,223 @@ class _DeviceModelCard extends StatelessWidget {
                         colorScheme.onPrimaryContainer.withValues(alpha: 0.78),
                   ),
             ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+            child: FilledButton.icon(
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const _ManualControlPage(),
+                ),
+              ),
+              icon: const Icon(Icons.touch_app_rounded),
+              label: const Text('Bật điều khiển Manual'),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualControlPage extends StatefulWidget {
+  const _ManualControlPage();
+
+  @override
+  State<_ManualControlPage> createState() => _ManualControlPageState();
+}
+
+class _ManualControlPageState extends State<_ManualControlPage> {
+  final _ble = ExoBleService.shared;
+  String _selectedJoint = 'right_hip';
+  String _direction = 'OUT';
+  bool _sending = false;
+  bool _closing = false;
+  String _message = 'Chạm vào một khớp trên mô hình để chọn.';
+
+  static const _jointLabels = {
+    'right_hip': 'Hông phải',
+    'right_knee': 'Gối phải',
+    'left_hip': 'Hông trái',
+    'left_knee': 'Gối trái',
+  };
+
+  static const _jointMotors = {
+    'right_hip': 'C2',
+    'right_knee': 'C1',
+    'left_hip': 'C4',
+    'left_knee': 'C3',
+  };
+
+  void _selectJoint(String raw) {
+    try {
+      final data = jsonDecode(raw) as Map<String, dynamic>;
+      final key = '${data['side']}_${data['joint']}';
+      if (_jointLabels.containsKey(key) && mounted) {
+        setState(() {
+          _selectedJoint = key;
+          _message = '${_jointLabels[key]} đã được chọn.';
+        });
+      }
+    } catch (_) {
+      // A malformed hotspot event must never affect motor control.
+    }
+  }
+
+  Future<void> _move(int durationMs) async {
+    if (_sending) return;
+    setState(() {
+      _sending = true;
+      _message = 'Đang gửi lệnh tới ${_jointLabels[_selectedJoint]}…';
+    });
+    try {
+      await _ble.sendManualMotor(
+        motor: _jointMotors[_selectedJoint]!,
+        direction: _direction,
+        durationMs: durationMs,
+      );
+      if (mounted) {
+        setState(() {
+          _message =
+              '${_jointLabels[_selectedJoint]}: ${_direction == 'OUT' ? 'co / nâng' : 'duỗi / hạ'} ${durationMs ~/ 1000}s';
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _message = 'Không gửi được lệnh: $error');
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _stopAndClose() async {
+    if (_closing) return;
+    _closing = true;
+    try {
+      await _ble.stopManualMotors();
+    } finally {
+      if (mounted) Navigator.of(context).pop();
+    }
+  }
+
+  @override
+  void dispose() {
+    if (!_closing) unawaited(_ble.stopManualMotors());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final selected = _jointLabels[_selectedJoint]!;
+    return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Điều khiển Manual'),
+        backgroundColor: Colors.white,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          onPressed: _stopAndClose,
+          icon: const Icon(Icons.close_rounded),
+          tooltip: 'Thoát Manual',
+        ),
+        actions: [
+          IconButton.filledTonal(
+            onPressed: _sending ? null : () => _ble.stopManualMotors(),
+            icon: const Icon(Icons.stop_rounded),
+            tooltip: 'Dừng tất cả',
+          ),
+          const SizedBox(width: 10),
+        ],
+      ),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primaryContainer, scheme.secondaryContainer],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Row(children: [
+              const Icon(Icons.warning_amber_rounded),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Manual chỉ dùng khi người tập đã ngồi/đứng an toàn. Mỗi lệnh sẽ tự dừng theo thời gian đã chọn.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 360,
+            child: ExoKinematicModel(onJointSelected: _selectJoint),
+          ),
+          const SizedBox(height: 10),
+          Center(
+            child: Text(_message,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    color: scheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600)),
+          ),
+          const SizedBox(height: 16),
+          Text('Khớp đang điều khiển: $selected',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _jointLabels.entries
+                .map((entry) => ChoiceChip(
+                      label: Text(entry.value),
+                      selected: entry.key == _selectedJoint,
+                      onSelected: (_) =>
+                          setState(() => _selectedJoint = entry.key),
+                    ))
+                .toList(),
+          ),
+          const SizedBox(height: 16),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'OUT', label: Text('Co / nâng')),
+              ButtonSegment(value: 'IN', label: Text('Duỗi / hạ')),
+            ],
+            selected: {_direction},
+            onSelectionChanged: (value) =>
+                setState(() => _direction = value.first),
+          ),
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: _sending ? null : () => _move(5000),
+                icon: const Icon(Icons.looks_one_rounded),
+                label: const Text('Nấc 1 · 5 giây'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton.icon(
+                onPressed: _sending ? null : () => _move(7000),
+                icon: const Icon(Icons.looks_two_rounded),
+                label: const Text('Nấc 2 · 7 giây'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: _sending ? null : () => _ble.stopManualMotors(),
+            icon: const Icon(Icons.stop_circle_outlined),
+            label: const Text('Dừng tất cả xy lanh'),
           ),
         ],
       ),

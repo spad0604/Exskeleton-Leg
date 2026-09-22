@@ -68,8 +68,8 @@ class MotionRoutineServiceTests {
     @Test
     void motionLibraryUsesBackendDefaults() {
         var library = service.library();
-        assertEquals(3000, library.get(0).get("duration_ms"));
-        assertEquals(5000, library.get(1).get("duration_ms"));
+        assertEquals(5000, library.get(0).get("duration_ms"));
+        assertEquals(7000, library.get(1).get("duration_ms"));
         assertEquals(1000, library.get(1).get("default_rest_after_ms"));
     }
 

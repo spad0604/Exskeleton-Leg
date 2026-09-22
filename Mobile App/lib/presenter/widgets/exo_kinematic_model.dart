@@ -7,7 +7,9 @@ import 'package:model_viewer_plus/model_viewer_plus.dart';
 /// left/right assemblies from their geometry and applies virtual hip and knee
 /// pivots without rewriting the model asset.
 class ExoKinematicModel extends StatelessWidget {
-  const ExoKinematicModel({super.key});
+  final ValueChanged<String>? onJointSelected;
+
+  const ExoKinematicModel({super.key, this.onJointSelected});
 
   static const _controls = r'''
     <div class="exo-help" id="exo-help">Hông và gối kéo lên/xuống</div>
@@ -365,6 +367,18 @@ class ExoKinematicModel extends StatelessWidget {
         handle.addEventListener('pointercancel', finish);
       }
 
+      function attachManualSelection(side, joint) {
+        const handle = document.querySelector(`#${side}-${joint}`);
+        if (!handle) return;
+        handle.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (typeof ExoManual !== 'undefined') {
+            ExoManual.postMessage(JSON.stringify({side, joint}));
+          }
+        });
+      }
+
       function initialise() {
         scene = modelScene();
         if (!scene || !scene._model) {
@@ -392,6 +406,10 @@ class ExoKinematicModel extends StatelessWidget {
         attachHipDrag('left');
         attachKneeDrag('right');
         attachKneeDrag('left');
+        attachManualSelection('right', 'hip');
+        attachManualSelection('right', 'knee');
+        attachManualSelection('left', 'hip');
+        attachManualSelection('left', 'knee');
         applyLeg('right');
         applyLeg('left');
         help.textContent = 'Kéo hông để nâng đùi · Kéo gối để gập chân';
@@ -413,7 +431,7 @@ class ExoKinematicModel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const ModelViewer(
+    return ModelViewer(
       id: 'exo-kinematic-viewer',
       src: 'assets/EXO_SLT.glb',
       alt: 'Interactive EXO-SLT lower-limb exoskeleton',
@@ -434,6 +452,15 @@ class ExoKinematicModel extends StatelessWidget {
       relatedCss: _styles,
       relatedJs: _kinematics,
       debugLogging: false,
+      javascriptChannels: onJointSelected == null
+          ? null
+          : {
+              JavascriptChannel(
+                'ExoManual',
+                onMessageReceived: (message) =>
+                    onJointSelected!(message.message),
+              ),
+            },
     );
   }
 }

@@ -37,6 +37,7 @@ class BleBridge(Node):
         self._prepare_pub = self.create_publisher(PrepareExercise, '/exo/exercise/prepare', 10)
         self._exercise_pub = self.create_publisher(ExerciseCommand, '/exo/exercise/request', 10)
         self._routine_pub = self.create_publisher(String, '/exo/routine/request', 10)
+        self._manual_pub = self.create_publisher(String, '/exo/manual/request', 10)
         self.create_subscription(ExerciseStatus, '/exo/exercise/status', self._on_status, 10)
         self.create_subscription(DeviceState, '/exo/state', self._on_device_state, 10)
         self.create_subscription(String, '/exo/button/event', self._on_button_event, 10)
@@ -143,6 +144,8 @@ class BleBridge(Node):
                 self._handle_prepare(payload)
             elif packet_type == 'exercise_command':
                 self._handle_exercise_command(payload)
+            elif packet_type == 'manual_command':
+                self._handle_manual_command(payload)
             elif packet_type == 'routine_command':
                 self._handle_routine_command(payload)
             elif packet_type == 'routine_begin':
@@ -234,6 +237,32 @@ class BleBridge(Node):
         # SafetyGateway performs the authoritative validation before UART TX.
         message.data = json.dumps(payload, separators=(',', ':'))
         self._routine_pub.publish(message)
+
+    def _handle_manual_command(self, payload):
+        action = str(payload.get('action', ''))
+        if action == 'stop':
+            message = String()
+            message.data = json.dumps({
+                'v': 1, 'type': 'manual_command', 'action': 'stop',
+            }, separators=(',', ':'))
+            self._manual_pub.publish(message)
+            return
+        motor = str(payload.get('motor', ''))
+        direction = str(payload.get('direction', ''))
+        duration = int(payload.get('duration_ms', 0))
+        if motor not in ('C1', 'C2', 'C3', 'C4'):
+            raise ValueError('unsupported manual motor')
+        if direction not in ('OUT', 'IN'):
+            raise ValueError('unsupported manual direction')
+        if duration not in (5000, 7000):
+            raise ValueError('manual duration must be 5000ms or 7000ms')
+        message = String()
+        message.data = json.dumps({
+            'v': 1, 'type': 'manual_command', 'action': 'move',
+            'motor': motor, 'direction': direction,
+            'duration_ms': duration,
+        }, separators=(',', ':'))
+        self._manual_pub.publish(message)
 
     def _handle_prepare(self, payload):
         required = ('session_id', 'plan_item_id', 'exercise_code', 'sets', 'repetitions')

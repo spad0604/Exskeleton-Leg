@@ -22,18 +22,18 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class MotionRoutineService {
     private static final int MIN_REVERSE_REST_MS = 700;
-    @Value("${exo.motion.thigh-raise-low-ms:3000}")
-    private int thighRaiseLowMs = 3000;
-    @Value("${exo.motion.thigh-raise-high-ms:5000}")
-    private int thighRaiseHighMs = 5000;
-    @Value("${exo.motion.thigh-lower-ms:3000}")
-    private int thighLowerMs = 3000;
-    @Value("${exo.motion.knee-bend-low-ms:2000}")
-    private int kneeBendLowMs = 2000;
-    @Value("${exo.motion.knee-kick-low-ms:1500}")
-    private int kneeKickLowMs = 1500;
-    @Value("${exo.motion.knee-kick-high-ms:2500}")
-    private int kneeKickHighMs = 2500;
+    @Value("${exo.motion.thigh-raise-low-ms:5000}")
+    private int thighRaiseLowMs = 5000;
+    @Value("${exo.motion.thigh-raise-high-ms:7000}")
+    private int thighRaiseHighMs = 7000;
+    @Value("${exo.motion.thigh-lower-ms:5000}")
+    private int thighLowerMs = 5000;
+    @Value("${exo.motion.knee-bend-low-ms:5000}")
+    private int kneeBendLowMs = 5000;
+    @Value("${exo.motion.knee-kick-low-ms:5000}")
+    private int kneeKickLowMs = 5000;
+    @Value("${exo.motion.knee-kick-high-ms:7000}")
+    private int kneeKickHighMs = 7000;
     @Value("${exo.motion.default-rest-after-ms:1000}")
     private int defaultRestAfterMs = 1000;
     private final JdbcTemplate jdbc;

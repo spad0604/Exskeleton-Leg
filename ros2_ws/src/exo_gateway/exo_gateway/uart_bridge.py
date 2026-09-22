@@ -69,6 +69,7 @@ class UartBridge(Node):
         self.create_subscription(DeviceCommand, '/exo/command/accepted', self._on_device_command, 10)
         self.create_subscription(ExerciseCommand, '/exo/exercise/accepted', self._on_exercise_command, 10)
         self.create_subscription(String, '/exo/routine/accepted', self._on_routine_command, 10)
+        self.create_subscription(String, '/exo/manual/accepted', self._on_manual_command, 10)
         self._routine_stop = threading.Event()
         self._routine_io_lock = threading.Lock()
         self._status_condition = threading.Condition()
@@ -183,6 +184,30 @@ class UartBridge(Node):
             target=self._run_routine, args=(payload, self._routine_stop),
             name='exo-routine-runner', daemon=True)
         self._routine_thread.start()
+
+    def _on_manual_command(self, message):
+        try:
+            payload = json.loads(message.data)
+        except (TypeError, json.JSONDecodeError):
+            self.get_logger().warning('Invalid manual command JSON')
+            return
+        if payload.get('action') == 'stop':
+            with self._routine_io_lock:
+                for motor in ('C1', 'C2', 'C3', 'C4'):
+                    self._send({'type': 'motor_command', 'session_id': 'manual',
+                                'motor': motor, 'direction': 'STOP', 'duration_ms': 0})
+            self.get_logger().info('Manual mode stopped all motors')
+            return
+        with self._routine_io_lock:
+            self._send({
+                'type': 'motor_command', 'session_id': 'manual',
+                'motor': payload.get('motor'),
+                'direction': payload.get('direction'),
+                'duration_ms': int(payload.get('duration_ms', 0)),
+            })
+        self.get_logger().info(
+            f"Manual motor {payload.get('motor')} {payload.get('direction')} "
+            f"for {payload.get('duration_ms')}ms")
 
     def _run_routine(self, payload, stop_event):
         session_id = str(payload.get('session_id', ''))[:64]
