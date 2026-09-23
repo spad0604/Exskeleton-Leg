@@ -129,7 +129,7 @@ class _PlanListViewState extends State<_PlanListView> {
                   progress: 0,
                   onTap: () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
-                      builder: (_) => _ExerciseDetailPage(
+                      builder: (_) => ExercisePreparationPage(
                         planItem: item,
                       ),
                     ),
@@ -2306,16 +2306,16 @@ class _ExerciseCard extends StatelessWidget {
   }
 }
 
-class _ExerciseDetailPage extends StatefulWidget {
+class ExercisePreparationPage extends StatefulWidget {
   final Map planItem;
 
-  const _ExerciseDetailPage({required this.planItem});
+  const ExercisePreparationPage({required this.planItem});
 
   @override
-  State<_ExerciseDetailPage> createState() => _ExerciseDetailPageState();
+  State<ExercisePreparationPage> createState() => _ExerciseDetailPageState();
 }
 
-class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
+class _ExerciseDetailPageState extends State<ExercisePreparationPage> {
   final _ble = ExoBleService.shared;
   String _deviceStatus = 'Chưa kết nối thiết bị';
   ExerciseDeviceStatus? _liveExercise;
@@ -2373,15 +2373,16 @@ class _ExerciseDetailPageState extends State<_ExerciseDetailPage> {
   }
 
   String _friendlyExerciseState(String state) => switch (state) {
-        'running' => 'Đang khởi động bài tập',
-        'stopping' => 'Đang đưa chân về vị trí ban đầu',
-        'flexing' => 'Đang nâng/chuyển động lên',
-        'extending' => 'Đang trở về tư thế ban đầu',
-        'paused' => 'Đã tạm dừng',
-        'completed' => 'Đã hoàn thành bài tập',
-        'stopped' => 'Đã dừng bài tập',
-        'prepared' => 'Thiết bị đã sẵn sàng',
-        'not_ready' => 'Thiết bị chưa sẵn sàng',
+        'running' => LocaleKeys.Patient_Training_RunningExercise.tr(),
+        'stopping' => LocaleKeys.Patient_Training_StoppingExercise.tr(),
+        'flexing' => LocaleKeys.Patient_Training_FlexingExercise.tr(),
+        'extending' => LocaleKeys.Patient_Training_ExtendingExercise.tr(),
+        'paused' => LocaleKeys.Patient_Training_PausedExercise.tr(),
+        'completed' => LocaleKeys.Patient_Training_CompletedExercise.tr(),
+        'stopped' => LocaleKeys.Patient_Training_StoppedExercise.tr(),
+        'prepared' => LocaleKeys.Patient_Training_PreparedExercise.tr(),
+        'not_ready' => LocaleKeys.Patient_Training_NotReadyExercise.tr(),
+        'selected' => LocaleKeys.Patient_Training_SelectedExercise.tr(),
         _ => state,
       };
 

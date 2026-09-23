@@ -705,7 +705,12 @@ void handleFrame(const String& frame) {
     selectedExercise = static_cast<uint8_t>(index); String action = jsonString(payload, "action");
     targetSets = constrain(jsonInt(payload, "sets", 1), 1, 20);
     targetRepetitions = constrain(jsonInt(payload, "repetitions", 1), 1, 100);
-    if (action == "stop") stopExercise();
+    if (action == "stop") {
+      // Echo the request identity in the terminal HOME status so a mobile
+      // client can wait for the physical return before changing screens.
+      if (session.length() > 0) activeSession = session;
+      stopExercise();
+    }
     else if (action == "start") {
       const bool resume = exercisePaused && activeSession == session;
       if (!resume) {

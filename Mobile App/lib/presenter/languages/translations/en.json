@@ -137,6 +137,20 @@
       "InProgress": "In progress",
       "Completed": "Completed",
       "Skipped": "Skipped"
+      ,"ReturningHome": "Returning to the starting position…"
+      ,"SwitchExerciseFailed": "Could not switch exercise: {}"
+      ,"ExerciseChanged": "Returned to the starting position · selected a new exercise"
+      ,"StartingExercise": "Starting exercise"
+      ,"StoppingExercise": "Returning to the starting position"
+      ,"ExtendingExercise": "Returning to the starting position"
+      ,"FlexingExercise": "Moving up / flexing"
+      ,"RunningExercise": "Starting exercise"
+      ,"PausedExercise": "Exercise paused"
+      ,"CompletedExercise": "Exercise completed"
+      ,"StoppedExercise": "Exercise stopped"
+      ,"PreparedExercise": "Device is ready"
+      ,"NotReadyExercise": "Device is not ready"
+      ,"SelectedExercise": "Exercise selected"
     },
     "Progress": {
       "Week": "Week",

@@ -15,6 +15,7 @@ import 'package:flutter_starter/presenter/navigation/navigation_logger.dart';
 import 'package:flutter_starter/services/firebase/fcm_service.dart';
 import 'package:flutter_starter/services/ble/exo_ble_service.dart';
 import 'package:flutter_starter/services/ble/exo_ble_protocol.dart';
+import 'package:flutter_starter/presenter/pages/patient/patient_placeholders.dart';
 
 class App extends StatefulWidget {
   static final _appRouter = provider.get<AppRouter>();
@@ -30,7 +31,11 @@ class _AppState extends State<App> {
   final _messengerKey = GlobalKey<ScaffoldMessengerState>();
   StreamSubscription? _messageSubscription;
   StreamSubscription<FallAlert>? _fallSubscription;
+  StreamSubscription<ExerciseDeviceStatus>? _exerciseSubscription;
   final _reportedFallAlerts = <String>{};
+  bool _switchingExercise = false;
+  String? _lastSelectedCode;
+  DateTime? _lastSelectedAt;
 
   @override
   void initState() {
@@ -48,13 +53,74 @@ class _AppState extends State<App> {
       );
     });
     _fallSubscription = ExoBleService.shared.fallAlerts.listen(_relayFallAlert);
+    _exerciseSubscription =
+        ExoBleService.shared.status.listen(_handleExerciseStatus);
   }
 
   @override
   void dispose() {
     _messageSubscription?.cancel();
     _fallSubscription?.cancel();
+    _exerciseSubscription?.cancel();
     super.dispose();
+  }
+
+  Future<void> _handleExerciseStatus(ExerciseDeviceStatus status) async {
+    final code = status.exerciseCode;
+    if (!mounted ||
+        status.state != 'selected' ||
+        code == null ||
+        code.isEmpty ||
+        _switchingExercise) {
+      return;
+    }
+    final now = DateTime.now();
+    if (_lastSelectedCode == code &&
+        _lastSelectedAt != null &&
+        now.difference(_lastSelectedAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastSelectedCode = code;
+    _lastSelectedAt = now;
+    final account = context.read<AuthBloc>().state.account;
+    if (account == null || !account.roles.contains('patient')) return;
+
+    _switchingExercise = true;
+    try {
+      // ESP32 reports the selected code before starting its HOME cycle. Do
+      // not navigate until the terminal STOP/HOME acknowledgement arrives.
+      await ExoBleService.shared.stopForDeviceSelection(exerciseCode: code);
+
+      final items = await provider.get<NetworkDataSource>().getPlanItems(
+            account.id,
+            scope: 'today',
+          );
+      Map<String, dynamic>? item;
+      for (final candidate in items) {
+        final exercise = candidate['exercise'];
+        if (exercise is Map && exercise['code'] == code) {
+          item = candidate;
+          break;
+        }
+      }
+      item ??= {
+        'id': 'device-selection-$code',
+        'session_id': 'local-ui',
+        'exercise': {'code': code},
+        'target': {'sets': 1, 'repetitions_per_set': 1},
+      };
+
+      final navigator = App._appRouter.navigatorKey.currentState;
+      if (navigator != null && mounted) {
+        await navigator.push<void>(MaterialPageRoute<void>(
+          builder: (_) => ExercisePreparationPage(planItem: item!),
+        ));
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Exercise selection navigation failed: $error\n$stackTrace');
+    } finally {
+      _switchingExercise = false;
+    }
   }
 
   Future<void> _relayFallAlert(FallAlert alert) async {

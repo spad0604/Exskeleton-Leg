@@ -368,6 +368,22 @@ class ExoBleService {
     await acknowledgement;
   }
 
+  /// Stops the routine selected from the ESP32 local menu. The local menu
+  /// uses `local-ui`, while an active mobile session may have another ID, so
+  /// this acknowledgement intentionally matches the physical terminal state
+  /// instead of assuming one session identity.
+  Future<void> stopForDeviceSelection({required String exerciseCode}) async {
+    final acknowledgement = status
+        .firstWhere((event) => event.state == 'stopped')
+        .timeout(const Duration(seconds: 15));
+    await _sendExerciseCommand(
+      sessionId: 'local-ui',
+      exerciseCode: exerciseCode,
+      action: 'stop',
+    );
+    await acknowledgement;
+  }
+
   /// Sends a server-compiled routine in acknowledged chunks. A normal routine
   /// is larger than one BLE ATT write, even with a negotiated 512-byte MTU.
   Future<void> sendRoutine(

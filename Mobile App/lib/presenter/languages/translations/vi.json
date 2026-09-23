@@ -137,6 +137,20 @@
       "InProgress": "Đang tập",
       "Completed": "Đã hoàn thành",
       "Skipped": "Đã bỏ qua"
+      ,"ReturningHome": "Đang đưa chân về vị trí ban đầu…"
+      ,"SwitchExerciseFailed": "Không chuyển bài được: {}"
+      ,"ExerciseChanged": "Đã về vị trí ban đầu · đã chọn bài mới"
+      ,"StartingExercise": "Đang khởi động bài tập"
+      ,"StoppingExercise": "Đang đưa chân về vị trí ban đầu"
+      ,"ExtendingExercise": "Đang trở về tư thế ban đầu"
+      ,"FlexingExercise": "Đang nâng/chuyển động lên"
+      ,"RunningExercise": "Đang khởi động bài tập"
+      ,"PausedExercise": "Đã tạm dừng bài tập"
+      ,"CompletedExercise": "Đã hoàn thành bài tập"
+      ,"StoppedExercise": "Đã dừng bài tập"
+      ,"PreparedExercise": "Thiết bị đã sẵn sàng"
+      ,"NotReadyExercise": "Thiết bị chưa sẵn sàng"
+      ,"SelectedExercise": "Đã chọn bài tập"
     },
     "Progress": {
       "Week": "Tuần",
