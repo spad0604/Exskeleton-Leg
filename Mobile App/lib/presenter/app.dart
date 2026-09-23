@@ -130,6 +130,14 @@ class _AppState extends State<App> {
         ? '${alert.deviceId}:${alert.timestampMs}:${alert.fallProbability}'
         : alert.alertId;
     if (!_reportedFallAlerts.add(key)) return;
+    if (mounted) {
+      _messengerKey.currentState?.showSnackBar(
+        const SnackBar(
+          content: Text('Phát hiện nguy cơ té ngã. Đang gửi cảnh báo đến người giám sát...'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
     try {
       await provider.get<NetworkDataSource>().reportFall(
             patientId: account.id,
@@ -141,12 +149,20 @@ class _AppState extends State<App> {
           );
       if (mounted) {
         _messengerKey.currentState?.showSnackBar(
-          const SnackBar(content: Text('Đã gửi cảnh báo đến người hướng dẫn.')),
+          const SnackBar(content: Text('Đã lưu cảnh báo ngã và gửi yêu cầu thông báo cho người giám sát.')),
         );
       }
     } catch (error, stackTrace) {
       debugPrint('Fall alert relay failed: $error\n$stackTrace');
       _reportedFallAlerts.remove(key);
+      if (mounted) {
+        _messengerKey.currentState?.showSnackBar(
+          const SnackBar(
+            content: Text('Chưa gửi được cảnh báo ngã. Kiểm tra mạng và kết nối lại thiết bị.'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     }
   }
 

@@ -18,6 +18,7 @@ class CaregiverShellPage extends StatefulWidget {
 class _CaregiverShellPageState extends State<CaregiverShellPage> {
   late Future<List<Map<String, dynamic>>> _relationships;
   int _selectedIndex = 0;
+  int _notificationsVersion = 0;
 
   @override
   void initState() {
@@ -64,16 +65,24 @@ class _CaregiverShellPageState extends State<CaregiverShellPage> {
         onManage: _openNetwork,
         onOpenPatient: _openPatient,
       ),
-      const PatientNotificationsPage(),
+      PatientNotificationsPage(key: ValueKey(_notificationsVersion)),
       _CaregiverSettings(
-          accountName: account?.displayName ?? '', onManage: _openNetwork),
+          accountName: account?.displayName ?? '',
+          onManage: _openNetwork,
+          onNotifications: () => setState(() {
+            _selectedIndex = 2;
+            _notificationsVersion++;
+          })),
     ];
     return Scaffold(
       backgroundColor: Colors.white,
       body: IndexedStack(index: _selectedIndex, children: pages),
       bottomNavigationBar: _CaregiverNavigationBar(
         selectedIndex: _selectedIndex,
-        onSelected: (index) => setState(() => _selectedIndex = index),
+        onSelected: (index) => setState(() {
+          _selectedIndex = index;
+          if (index == 2) _notificationsVersion++;
+        }),
       ),
     );
   }
@@ -205,7 +214,12 @@ class _CaregiverPatients extends StatelessWidget {
 class _CaregiverSettings extends StatelessWidget {
   final String accountName;
   final Future<void> Function() onManage;
-  const _CaregiverSettings({required this.accountName, required this.onManage});
+  final VoidCallback onNotifications;
+  const _CaregiverSettings({
+    required this.accountName,
+    required this.onManage,
+    required this.onNotifications,
+  });
 
   Future<void> _logout(BuildContext context) async {
     await provider.get<NetworkDataSource>().logout();
@@ -240,11 +254,12 @@ class _CaregiverSettings extends StatelessWidget {
             onTap: onManage,
           ),
           const SizedBox(height: 10),
-          const _CaregiverSettingTile(
+          _CaregiverSettingTile(
             assetPath: 'assets/images/gen_assets/asset_notifications.png',
             title: 'Thông báo an toàn',
             subtitle: 'Theo dõi lời mời và cảnh báo mới nhất',
             accent: Color(0xFF18A6A8),
+            onTap: onNotifications,
           ),
           const SizedBox(height: 20),
           const _CareSettingsLabel('Ứng dụng'),

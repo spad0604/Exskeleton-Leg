@@ -27,6 +27,7 @@ static constexpr uint8_t TCA9548A_ADDRESS = 0x70;
 static constexpr uint8_t MPU6050_ADDRESS = 0x68;
 static constexpr uint8_t MPU6050_CHANNEL = 4;
 static constexpr uint32_t IMU_SAMPLE_PERIOD_MS = 10; // 100 Hz
+static constexpr uint32_t IMU_CONFIG_CHECK_PERIOD_MS = 1000;
 static constexpr int BUTTON_PREVIOUS = 13;
 static constexpr int BUTTON_NEXT = 34;
 static constexpr int BUTTON_SELECT = 35;
@@ -109,7 +110,12 @@ uint32_t lastBatteryMs = 0;
 float batteryVoltage = -1.0f;
 float batteryPercent = -1.0f;
 bool imuReady = false;
+const char* imuError = "not_initialized";
+int imuWhoAmI = -1;
+int imuAccelConfig = -1;
+int imuGyroConfig = -1;
 uint32_t lastImuSampleMs = 0;
+uint32_t lastImuConfigCheckMs = 0;
 uint32_t imuSequence = 0;
 
 enum MotorDirection : int8_t { MOTOR_STOP = 0, MOTOR_OUT = 1, MOTOR_IN = -1 };
@@ -217,6 +223,10 @@ void sendDeviceStatus() {
     ",\"estop_active\":" + (estopActive ? "true" : "false") +
     ",\"command_watchdog_ok\":false,\"imu_ready\":" + String(imuReady ? "true" : "false") +
     ",\"imu_channel\":" + String(MPU6050_CHANNEL) +
+    ",\"imu_error\":\"" + imuError + "\"" +
+    ",\"imu_who_am_i\":" + String(imuWhoAmI) +
+    ",\"imu_accel_config\":" + String(imuAccelConfig) +
+    ",\"imu_gyro_config\":" + String(imuGyroConfig) +
     ",\"button_previous\":" + String(digitalRead(BUTTON_PREVIOUS)) +
     ",\"button_next\":" + String(digitalRead(BUTTON_NEXT)) +
     ",\"button_select\":" + String(digitalRead(BUTTON_SELECT)) +
@@ -239,21 +249,74 @@ bool mpuWriteRegister(uint8_t reg, uint8_t value) {
   return Wire.endTransmission() == 0;
 }
 
-bool initMpu6050() {
+bool mpuReadRegister(uint8_t reg, uint8_t& value) {
   if (!selectI2cChannel(MPU6050_CHANNEL)) return false;
   Wire.beginTransmission(MPU6050_ADDRESS);
-  Wire.write(0x75); // WHO_AM_I
-  if (Wire.endTransmission(false) != 0 || Wire.requestFrom(MPU6050_ADDRESS, static_cast<uint8_t>(1)) != 1)
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0 ||
+      Wire.requestFrom(MPU6050_ADDRESS, static_cast<uint8_t>(1)) != 1)
     return false;
-  const uint8_t whoAmI = Wire.read();
-  if (whoAmI != 0x68 && whoAmI != 0x69) return false;
+  value = Wire.read();
+  return true;
+}
+
+bool mpuRangesConfigured() {
+  uint8_t accelConfig = 0;
+  uint8_t gyroConfig = 0;
+  imuAccelConfig = -1;
+  imuGyroConfig = -1;
+  if (!mpuReadRegister(0x1C, accelConfig)) {
+    imuError = "accel_config_read_failed";
+    return false;
+  }
+  imuAccelConfig = accelConfig;
+  if (!mpuReadRegister(0x1B, gyroConfig)) {
+    imuError = "gyro_config_read_failed";
+    return false;
+  }
+  imuGyroConfig = gyroConfig;
+  if ((accelConfig & 0x18) != 0x18 || (gyroConfig & 0x18) != 0x18) {
+    imuError = "range_mismatch";
+    return false;
+  }
+  imuError = "";
+  return true;
+}
+
+bool initMpu6050() {
+  uint8_t whoAmI = 0;
+  imuWhoAmI = -1;
+  if (!mpuReadRegister(0x75, whoAmI)) {
+    imuError = "who_am_i_read_failed";
+    return false;
+  }
+  imuWhoAmI = whoAmI;
+  // Some boards sold as MPU6050 contain an MPU6500 (WHO_AM_I = 0x70).
+  // Both use this register layout and the configured ±16g/±2000°/s scales.
+  if (whoAmI != 0x68 && whoAmI != 0x69 && whoAmI != 0x70) {
+    imuError = "who_am_i_mismatch";
+    return false;
+  }
 
   // Match the SisFall training ranges: accelerometer ±16g and gyro ±2000°/s.
-  if (!mpuWriteRegister(0x6B, 0x00)) return false;
-  if (!mpuWriteRegister(0x1C, 0x18)) return false; // ACCEL_CONFIG, ±16g
-  if (!mpuWriteRegister(0x1B, 0x18)) return false; // GYRO_CONFIG, ±2000°/s
-  if (!mpuWriteRegister(0x1A, 0x03)) return false;
-  return true;
+  if (!mpuWriteRegister(0x6B, 0x00)) {
+    imuError = "wake_write_failed";
+    return false;
+  }
+  delay(10); // Let the sensor wake before configuring and checking its ranges.
+  if (!mpuWriteRegister(0x1C, 0x18)) {
+    imuError = "accel_config_write_failed";
+    return false;
+  }
+  if (!mpuWriteRegister(0x1B, 0x18)) {
+    imuError = "gyro_config_write_failed";
+    return false;
+  }
+  if (!mpuWriteRegister(0x1A, 0x03)) {
+    imuError = "filter_config_write_failed";
+    return false;
+  }
+  return mpuRangesConfigured();
 }
 
 int16_t readI2cInt16() {
@@ -285,13 +348,28 @@ bool readMpu6050(float& ax, float& ay, float& az, float& gx, float& gy, float& g
 }
 
 void sendImuSample() {
+  const uint32_t now = millis();
+  if (imuReady && !mpuRangesConfigured()) {
+    imuReady = false;
+    lastImuConfigCheckMs = now;
+    return; // A reset MPU may have reverted to its default ±2g/±250°/s ranges.
+  }
+  if (!imuReady) {
+    if (now - lastImuConfigCheckMs < IMU_CONFIG_CHECK_PERIOD_MS) return;
+    lastImuConfigCheckMs = now;
+    imuReady = initMpu6050();
+    if (!imuReady) return;
+  }
   float ax, ay, az, gx, gy, gz;
   if (!readMpu6050(ax, ay, az, gx, gy, gz)) {
     imuReady = false;
+    imuError = "sample_read_failed";
+    lastImuConfigCheckMs = now;
     return;
   }
   imuReady = true;
-  String payload = String("{\"v\":1,\"type\":\"imu_sample\",\"sensor\":\"mpu6050\",\"channel\":") +
+  String payload = String("{\"v\":1,\"type\":\"imu_sample\",\"sensor\":\"") +
+    (imuWhoAmI == 0x70 ? "mpu6500" : "mpu6050") + "\",\"channel\":" +
     String(MPU6050_CHANNEL) + ",\"seq\":" + String(imuSequence++) +
     ",\"t_ms\":" + String(millis()) +
     ",\"ax\":" + String(ax, 6) + ",\"ay\":" + String(ay, 6) +
@@ -755,7 +833,6 @@ void setup() {
   ExoUart.begin(BAUD);
   Wire.begin(21, 22);
   Wire.setClock(400000);
-  imuReady = initMpu6050();
   // All three switches are externally pulled HIGH and connect the GPIO to
   // GND when pressed. GPIO34/35 do not have internal pull-up capability.
   pinMode(BUTTON_PREVIOUS, INPUT_PULLUP);
@@ -772,7 +849,10 @@ void setup() {
   display.begin(SSD1306_SWITCHCAPVCC, 0x3C);
   display.clearDisplay(); display.display();
 #endif
-  delay(250); readBattery(); sendDeviceStatus(); sendSelection();
+  delay(250);
+  imuReady = initMpu6050();
+  lastImuConfigCheckMs = millis();
+  readBattery(); sendDeviceStatus(); sendSelection();
 }
 
 void loop() {

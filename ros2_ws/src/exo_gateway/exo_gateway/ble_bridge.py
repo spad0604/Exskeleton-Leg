@@ -31,6 +31,8 @@ class BleBridge(Node):
         super().__init__('ble_bridge')
         self._loop = loop
         self._status_queue = asyncio.Queue(maxsize=16)
+        self._latest_fall_alert = None
+        self._latest_fall_at = 0.0
         self._last_device_status_at = 0.0
         self._last_device_status_key = None
         self._routine_transfers = {}
@@ -62,7 +64,7 @@ class BleBridge(Node):
     def _on_fall_alert(self, alert):
         # Safety events are forwarded immediately and are never rate-limited
         # like the ordinary device heartbeat.
-        self._queue_status({
+        payload = {
             'v': 1,
             'type': 'fall_alert',
             'alert_id': alert.alert_id,
@@ -73,7 +75,21 @@ class BleBridge(Node):
             'consecutive_fall_windows': int(alert.consecutive_fall_windows),
             'confirmed': bool(alert.confirmed),
             'timestamp_ms': int(time.time() * 1000),
-        })
+        }
+        self._latest_fall_alert = payload
+        self._latest_fall_at = time.monotonic()
+        self.get_logger().warning(
+            f'Forwarding fall alert {alert.alert_id} to BLE status; '
+            'it will be replayed on the next subscription if needed')
+        self._queue_status(payload)
+
+    def replay_recent_fall(self):
+        # A fall can occur before the phone connects. Replay the same alert ID
+        # on subscription so the server can deduplicate it.
+        if self._latest_fall_alert and time.monotonic() - self._latest_fall_at <= 300:
+            self.get_logger().warning(
+                f'Replaying fall alert {self._latest_fall_alert["alert_id"]} to BLE subscriber')
+            self._queue_status(self._latest_fall_alert)
 
     def _on_status(self, status):
         payload = {
@@ -124,10 +140,19 @@ class BleBridge(Node):
     def _queue_status(self, payload):
         def enqueue():
             if self._status_queue.full():
-                try:
-                    self._status_queue.get_nowait()
-                except asyncio.QueueEmpty:
-                    pass
+                # A heartbeat must not evict a safety event under BLE backpressure.
+                queued = [self._status_queue.get_nowait() for _ in range(self._status_queue.qsize())]
+                discard = next((i for i, item in enumerate(queued)
+                                if item.get('type') != 'fall_alert'), None)
+                if discard is None:
+                    if payload.get('type') != 'fall_alert':
+                        for item in queued:
+                            self._status_queue.put_nowait(item)
+                        return
+                    discard = 0
+                for index, item in enumerate(queued):
+                    if index != discard:
+                        self._status_queue.put_nowait(item)
             self._status_queue.put_nowait(payload)
         self._loop.call_soon_threadsafe(enqueue)
 
@@ -367,8 +392,11 @@ async def run():
 
     server.write_request_func = on_write
     server.read_request_func = on_read
-    server.app.StartNotify = lambda characteristic: node.get_logger().info(
-        'BLE central subscribed to status notifications')
+    def on_start_notify(characteristic):
+        node.get_logger().info('BLE central subscribed to status notifications')
+        node.replay_recent_fall()
+
+    server.app.StartNotify = on_start_notify
     server.app.StopNotify = lambda characteristic: node.get_logger().info(
         'BLE central unsubscribed from status notifications')
     await server.start()
@@ -380,6 +408,8 @@ async def run():
             characteristic.value = bytearray(json.dumps(status, separators=(',', ':')).encode())
             try:
                 server.update_value(SERVICE_UUID, STATUS_UUID)
+                if status.get('type') == 'fall_alert':
+                    node.get_logger().info(f'BLE fall alert update sent: {status.get("alert_id")}')
             except Exception as error:
                 node.get_logger().warning(f'BLE notification update failed: {error}')
     finally:

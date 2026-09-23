@@ -122,7 +122,7 @@ lệnh start xuống ESP32 và Mobile sẽ nhận not_ready/rejected. Đây là 
 ### Tự khởi động gateway khi Pi bật
 
 Pi này chạy ROS2 trong Docker. Sau khi build workspace và đặt model tại
-`/home/robot/exo_fall_detector_v4.tflite`, cài service:
+`/home/robot/fall_detection_6axis_float32_frozen.tflite`, cài service:
 
 ```bash
 sudo install -d /etc/systemd/system/bluetooth.service.d

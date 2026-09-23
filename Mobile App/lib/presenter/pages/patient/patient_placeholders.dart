@@ -1947,7 +1947,7 @@ class _ManualControlPageState extends State<_ManualControlPage> {
       if (mounted) {
         setState(() {
           _message =
-              '${_jointLabels[_selectedJoint]}: ${_direction == 'OUT' ? 'co / nâng' : 'duỗi / hạ'} ${durationMs ~/ 1000}s';
+              '${_jointLabels[_selectedJoint]}: ${_direction == 'OUT' ? 'co / nâng' : 'duỗi / hạ'} mức ${durationMs == 7000 ? 'cao' : 'thấp'}';
         });
       }
     } catch (error) {
@@ -1990,7 +1990,7 @@ class _ManualControlPageState extends State<_ManualControlPage> {
         ),
         actions: [
           IconButton.filledTonal(
-            onPressed: _sending ? null : () => _ble.stopManualMotors(),
+            onPressed: () => _ble.stopManualMotors(),
             icon: const Icon(Icons.stop_rounded),
             tooltip: 'Dừng tất cả',
           ),
@@ -2015,7 +2015,7 @@ class _ManualControlPageState extends State<_ManualControlPage> {
               const SizedBox(width: 10),
               Expanded(
                 child: Text(
-                  'Manual chỉ dùng khi người tập đã ngồi/đứng an toàn. Mỗi lệnh sẽ tự dừng theo thời gian đã chọn.',
+                  'Manual chỉ dùng khi người tập đã ngồi/đứng an toàn. Mỗi lệnh sẽ tự dừng theo mức đã chọn.',
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
               ),
@@ -2041,53 +2041,163 @@ class _ManualControlPageState extends State<_ManualControlPage> {
                   .titleMedium
                   ?.copyWith(fontWeight: FontWeight.w900)),
           const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _jointLabels.entries
-                .map((entry) => ChoiceChip(
-                      label: Text(entry.value),
-                      selected: entry.key == _selectedJoint,
-                      onSelected: (_) =>
-                          setState(() => _selectedJoint = entry.key),
-                    ))
-                .toList(),
-          ),
+          LayoutBuilder(builder: (context, constraints) {
+            final width = (constraints.maxWidth - 10) / 2;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: _jointLabels.entries
+                  .map((entry) => SizedBox(
+                        width: width,
+                        child: _ManualOptionTile(
+                          label: entry.value,
+                          icon: entry.key.endsWith('hip')
+                              ? Icons.accessibility_new_rounded
+                              : Icons.directions_walk_rounded,
+                          selected: entry.key == _selectedJoint,
+                          onTap: _sending
+                              ? null
+                              : () =>
+                                  setState(() => _selectedJoint = entry.key),
+                        ),
+                      ))
+                  .toList(),
+            );
+          }),
           const SizedBox(height: 16),
-          SegmentedButton<String>(
-            segments: const [
-              ButtonSegment(value: 'OUT', label: Text('Co / nâng')),
-              ButtonSegment(value: 'IN', label: Text('Duỗi / hạ')),
-            ],
-            selected: {_direction},
-            onSelectionChanged: (value) =>
-                setState(() => _direction = value.first),
-          ),
-          const SizedBox(height: 14),
+          Text('Hướng chuyển động',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
           Row(children: [
             Expanded(
-              child: OutlinedButton.icon(
-                onPressed: _sending ? null : () => _move(5000),
-                icon: const Icon(Icons.looks_one_rounded),
-                label: const Text('Nấc 1 · 5 giây'),
+              child: _ManualOptionTile(
+                label: 'Co / nâng',
+                icon: Icons.arrow_upward_rounded,
+                selected: _direction == 'OUT',
+                onTap:
+                    _sending ? null : () => setState(() => _direction = 'OUT'),
               ),
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: FilledButton.icon(
-                onPressed: _sending ? null : () => _move(7000),
-                icon: const Icon(Icons.looks_two_rounded),
-                label: const Text('Nấc 2 · 7 giây'),
+              child: _ManualOptionTile(
+                label: 'Duỗi / hạ',
+                icon: Icons.arrow_downward_rounded,
+                selected: _direction == 'IN',
+                onTap:
+                    _sending ? null : () => setState(() => _direction = 'IN'),
+              ),
+            ),
+          ]),
+          const SizedBox(height: 14),
+          Text('Mức chuyển động',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(fontWeight: FontWeight.w900)),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+              child: _ManualOptionTile(
+                label: 'Thấp',
+                icon: Icons.keyboard_arrow_up_rounded,
+                onTap: _sending ? null : () => _move(5000),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ManualOptionTile(
+                label: 'Cao',
+                icon: Icons.keyboard_double_arrow_up_rounded,
+                onTap: _sending ? null : () => _move(7000),
               ),
             ),
           ]),
           const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: _sending ? null : () => _ble.stopManualMotors(),
-            icon: const Icon(Icons.stop_circle_outlined),
-            label: const Text('Dừng tất cả xy lanh'),
+          _ManualOptionTile(
+            label: 'Dừng tất cả xy lanh',
+            icon: Icons.stop_circle_outlined,
+            danger: true,
+            onTap: () => _ble.stopManualMotors(),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _ManualOptionTile extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final bool danger;
+  final VoidCallback? onTap;
+
+  const _ManualOptionTile({
+    required this.label,
+    required this.icon,
+    required this.onTap,
+    this.selected = false,
+    this.danger = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final foreground = danger
+        ? scheme.error
+        : selected
+            ? scheme.primary
+            : scheme.onSurface;
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          decoration: BoxDecoration(
+            color: danger
+                ? scheme.errorContainer.withValues(alpha: 0.45)
+                : selected
+                    ? scheme.primaryContainer
+                    : scheme.surface,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: danger
+                  ? scheme.error.withValues(alpha: 0.55)
+                  : selected
+                      ? scheme.primary
+                      : scheme.outlineVariant,
+              width: selected ? 1.5 : 1,
+            ),
+          ),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(20),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+              child: Row(children: [
+                Icon(icon, color: foreground, size: 21),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                          color: foreground, fontWeight: FontWeight.w800)),
+                ),
+                if (selected) ...[
+                  const SizedBox(width: 4),
+                  Icon(Icons.check_circle_rounded,
+                      color: scheme.primary, size: 18),
+                ],
+              ]),
+            ),
+          ),
+        ),
       ),
     );
   }

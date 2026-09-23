@@ -17,23 +17,24 @@ import org.springframework.core.io.Resource;
 public class FirebaseConfig {
     @Bean
     @ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText('${app.firebase.service-account:}') or T(org.springframework.util.StringUtils).hasText('${app.firebase.service-account-json:}')")
-    FirebaseApp firebaseApp(
+    GoogleCredentials firebaseCredentials(
             @Value("${app.firebase.service-account:}") Resource serviceAccount,
             @Value("${app.firebase.service-account-json:}") String serviceAccountJson)
             throws IOException {
-        if (!FirebaseApp.getApps().isEmpty()) {
-            return FirebaseApp.getInstance();
-        }
-
         var input = serviceAccountJson != null && !serviceAccountJson.isBlank()
                 ? new ByteArrayInputStream(serviceAccountJson.getBytes(StandardCharsets.UTF_8))
                 : serviceAccount.getInputStream();
         try (input) {
-            var options = FirebaseOptions.builder()
-                    .setCredentials(GoogleCredentials.fromStream(input))
-                    .build();
-            return FirebaseApp.initializeApp(options);
+            return GoogleCredentials.fromStream(input);
         }
+    }
+
+    @Bean
+    @ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText('${app.firebase.service-account:}') or T(org.springframework.util.StringUtils).hasText('${app.firebase.service-account-json:}')")
+    FirebaseApp firebaseApp(GoogleCredentials firebaseCredentials) {
+        if (!FirebaseApp.getApps().isEmpty()) return FirebaseApp.getInstance();
+        var options = FirebaseOptions.builder().setCredentials(firebaseCredentials).build();
+        return FirebaseApp.initializeApp(options);
     }
 
     @Bean

@@ -17,7 +17,7 @@ uart_bridge:
 
 fall_detector:
   ros__parameters:
-    model_path: /home/robot/exo_fall_detector_v4.tflite
+    model_path: /home/robot/fall_detection_6axis_float32_frozen.tflite
     device_id: exo-leg-1
     window_size: 200
     inference_stride: 50

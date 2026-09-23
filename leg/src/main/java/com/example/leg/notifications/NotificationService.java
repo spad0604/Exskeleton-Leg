@@ -3,6 +3,8 @@ package com.example.leg.notifications;
 import com.google.firebase.messaging.FirebaseMessaging;
 import com.google.firebase.messaging.MulticastMessage;
 import com.google.firebase.messaging.Notification;
+import com.google.firebase.FirebaseApp;
+import com.google.auth.oauth2.GoogleCredentials;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
@@ -25,13 +27,19 @@ public class NotificationService {
     private static final Logger log = LoggerFactory.getLogger(NotificationService.class);
     private final JdbcTemplate jdbc;
     private final FirebaseMessaging firebase;
+    private final FcmHttpSender httpFallback;
     private final ObjectMapper objectMapper;
 
     public NotificationService(JdbcTemplate jdbc, ObjectProvider<FirebaseMessaging> firebase,
+            ObjectProvider<FirebaseApp> firebaseApp,
+            ObjectProvider<GoogleCredentials> firebaseCredentials,
             ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.firebase = firebase.getIfAvailable();
         this.objectMapper = objectMapper;
+        var app = firebaseApp.getIfAvailable();
+        var credentials = firebaseCredentials.getIfAvailable();
+        this.httpFallback = app == null || credentials == null ? null : new FcmHttpSender(app, credentials, objectMapper);
     }
 
     @Transactional
@@ -96,7 +104,7 @@ public class NotificationService {
         return result;
     }
 
-    @Transactional(readOnly = true)
+    @Transactional
     public void notifyUser(UUID userId, String title, String body, Map<String, String> data) {
         persistInbox(userId, data.getOrDefault("type", "general"), title, body, data);
         if (firebase == null) {
@@ -153,8 +161,17 @@ public class NotificationService {
             for (int i = 0; i < result.getResponses().size(); i++) {
                 var response = result.getResponses().get(i);
                 if (!response.isSuccessful()) {
-                    log.warn("FCM delivery failed for token {}: {}", mask(tokens.get(i)), response.getException());
                     var exception = response.getException();
+                    if (isGzipTransportFailure(exception) && httpFallback != null) {
+                        try {
+                            httpFallback.send(tokens.get(i), title, body, data);
+                            log.info("FCM HTTP v1 fallback delivered notification to token {}", mask(tokens.get(i)));
+                            continue;
+                        } catch (Exception fallbackError) {
+                            log.error("FCM HTTP v1 fallback failed for token {}", mask(tokens.get(i)), fallbackError);
+                        }
+                    }
+                    log.warn("FCM delivery failed for token {}: {}", mask(tokens.get(i)), exception);
                     if (exception != null && exception.getMessagingErrorCode() != null
                             && (exception.getMessagingErrorCode().name().contains("UNREGISTERED")
                             || exception.getMessagingErrorCode().name().contains("INVALID_ARGUMENT"))) {
@@ -165,6 +182,13 @@ public class NotificationService {
         } catch (Exception exception) {
             log.error("Could not send caregiver push notification", exception);
         }
+    }
+
+    private boolean isGzipTransportFailure(Throwable error) {
+        for (var cause = error; cause != null; cause = cause.getCause()) {
+            if (cause instanceof java.util.zip.ZipException) return true;
+        }
+        return false;
     }
 
     private void persistInbox(UUID userId, String type, String title, String body, Map<String, String> data) {

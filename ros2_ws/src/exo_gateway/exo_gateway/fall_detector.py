@@ -15,7 +15,7 @@ from exo_interfaces.msg import FallAlert, ImuSample
 class FallDetector(Node):
     def __init__(self):
         super().__init__('fall_detector')
-        self.declare_parameter('model_path', '/home/robot/exo_fall_detector_v4.tflite')
+        self.declare_parameter('model_path', '/home/robot/fall_detection_6axis_float32_frozen.tflite')
         self.declare_parameter('device_id', 'exo-leg-1')
         self.declare_parameter('window_size', 200)
         self.declare_parameter('inference_stride', 50)

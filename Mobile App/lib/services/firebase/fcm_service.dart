@@ -51,14 +51,14 @@ class FcmService {
     final token = await messaging.getToken();
     _token = token;
     if (kDebugMode) {
-      debugPrint('FCM token: $token');
+      debugPrint('FCM token acquired: ${token != null}');
     }
 
     messaging.onTokenRefresh.listen((token) {
       _token = token;
       _tokenController.add(token);
       if (kDebugMode) {
-        debugPrint('FCM token refreshed: $token');
+        debugPrint('FCM token refreshed');
       }
     });
 
